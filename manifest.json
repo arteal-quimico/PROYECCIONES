@@ -1,0 +1,16 @@
+{
+  "name": "Proyecciones App",
+  "short_name": "Proyecciones",
+  "description": "Control de flujo de caja, deudas y presupuestos base cero",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#d4af37",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
