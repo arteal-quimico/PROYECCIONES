@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proyecciones App</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="logo.png">
+    <meta name="theme-color" content="#d4af37">
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+        // Tus claves reales
+        const firebaseConfig = {
+            apiKey: "AIzaSyAy0pcPg5nF1cQNlSBLG_5JJvgJij0aswM",
+            authDomain: "presupuesto-45e0c.firebaseapp.com",
+            projectId: "presupuesto-45e0c",
+            storageBucket: "presupuesto-45e0c.firebasestorage.app",
+            messagingSenderId: "647523607915",
+            appId: "1:647523607915:web:d308b2c54885f224b2182e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI Elements
+        const loginContainer = document.getElementById('login-container');
+        const dashboardContainer = document.getElementById('dashboard-container');
+        const userEmailDisplay = document.getElementById('user-email');
+        const accountsList = document.getElementById('accounts-list');
+        const totalBalanceDisplay = document.getElementById('total-balance');
+
+        let currentUser = null;
+
+        // Autenticación
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loginContainer.style.display = 'none';
+                dashboardContainer.style.display = 'block';
+                userEmailDisplay.textContent = user.email;
+                cargarDatos(user.uid); 
+            } else {
+                currentUser = null;
+                loginContainer.style.display = 'block';
+                dashboardContainer.style.display = 'none';
+            }
+        });
+
+        document.getElementById('btn-login').addEventListener('click', () => {
+            signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)
+                .catch(error => alert("Error: " + error.message));
+        });
+
+        document.getElementById('btn-register').addEventListener('click', () => {
+            createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)
+                .then(() => alert("¡Registrado!"))
+                .catch(error => alert("Error: " + error.message));
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        // Ver Contraseña
+        document.getElementById('toggle-password').addEventListener('click', function () {
+            const pwd = document.getElementById('password');
+            pwd.type = pwd.type === 'password' ? 'text' : 'password';
+            this.textContent = pwd.type === 'password' ? '👁️' : '🙈';
+        });
+
+        // Guardar Cuenta / Banco
+        document.getElementById('btn-add-account').addEventListener('click', async () => {
+            const nombre = document.getElementById('account-name').value;
+            const saldo = parseFloat(document.getElementById('account-balance').value);
+            if (nombre && !isNaN(saldo)) {
+                await addDoc(collection(db, "cuentas_bancarias"), { usuarioId: currentUser.uid, nombre, saldo });
+                document.getElementById('account-name').value = '';
+                document.getElementById('account-balance').value = '';
+            }
+        });
+
+        // Cargar Datos en Tiempo Real
+        function cargarDatos(uid) {
+            const q = query(collection(db, "cuentas_bancarias"), where("usuarioId", "==", uid));
+            onSnapshot(q, (snapshot) => {
+                accountsList.innerHTML = '';
+                let total = 0;
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    total += data.saldo;
+                    accountsList.innerHTML += `<li class="list-item"><span>🏦 ${data.nombre}</span> <strong>$${data.saldo.toFixed(2)}</strong></li>`;
+                });
+                totalBalanceDisplay.textContent = `$${total.toFixed(2)}`;
+            });
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; margin: 0; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; color: #fff; padding-top: 20px; }
+        .card { background: #262626; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(212,175,55,0.15); width: 90%; max-width: 400px; margin-bottom: 20px; }
+        .input-group { position: relative; margin: 10px 0; }
+        input, select { width: 100%; padding: 12px; background: #333; color: white; border: 1px solid #d4af37; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; }
+        .eye-icon { position: absolute; right: 10px; top: 40%; transform: translateY(-50%); cursor: pointer; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px; text-transform: uppercase;}
+        .btn-primary { background-color: #d4af37; color: #000; }
+        .btn-secondary { background-color: #444; color: #d4af37; border: 1px solid #d4af37;}
+        .btn-danger { background-color: #8b0000; color: white; }
+        h2, h4 { color: #d4af37; text-align: center; margin-top: 0;}
+        .total-box { background: #000; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #d4af37;}
+        .total-box h3 { margin: 0; color: #d4af37; font-size: 2.2em; }
+        .flex-row { display: flex; gap: 10px; }
+        ul { list-style: none; padding: 0; }
+        .list-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #444; background: #333; border-radius: 6px; margin-bottom: 5px;}
+    </style>
+</head>
+<body>
+
+    <div class="card" id="login-container">
+        <h2>PROYECCIONES APP</h2>
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <div class="input-group">
+            <input type="password" id="password" placeholder="Contraseña">
+            <span class="eye-icon" id="toggle-password">👁️</span>
+        </div>
+        <button class="btn-primary" id="btn-login">Iniciar Sesión</button>
+        <button class="btn-secondary" id="btn-register">Registrar Usuario</button>
+    </div>
+
+    <div class="card" id="dashboard-container" style="display: none;">
+        <h2>Flujo de Caja</h2>
+        <p style="text-align: center; font-size: 0.8em; color: #aaa;">Bóveda de: <span id="user-email"></span></p>
+        
+        <div class="total-box">
+            <p style="margin: 0; font-size: 0.9em;">Balance Total Disponible</p>
+            <h3 id="total-balance">$0.00</h3>
+        </div>
+
+        <h4>Registrar Ingreso</h4>
+        <select id="income-type">
+            <option value="sueldo">Sueldo Base</option>
+            <option value="comisiones">Comisiones</option>
+            <option value="beneficios">Beneficios de Ley</option>
+            <option value="otros">Otros</option>
+        </select>
+        <div class="flex-row">
+            <input type="number" id="income-amount" placeholder="Monto $" step="0.01">
+            <button class="btn-primary">+ Sumar</button>
+        </div>
+        <hr style="border-color: #444; margin: 20px 0;">
+
+        <h4>Mis Cuentas / Bancos</h4>
+        <div class="flex-row">
+            <input type="text" id="account-name" placeholder="Ej: B. Pichincha" style="flex: 2;">
+            <input type="number" id="account-balance" placeholder="Saldo Inicial" style="flex: 1;" step="0.01">
+        </div>
+        <button class="btn-secondary" id="btn-add-account">Crear Cuenta</button>
+        
+        <ul id="accounts-list"></ul>
+
+        <button class="btn-danger" id="btn-logout" style="margin-top: 30px;">Cerrar Sesión</button>
+    </div>
+
+</body>
+</html>
