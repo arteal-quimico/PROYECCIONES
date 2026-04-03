@@ -27,14 +27,26 @@
         const db = getFirestore(app);
 
         let currentUser = null;
-        let userAccounts = [];
 
         // --- NAVEGACIÓN ---
-        window.showTab = (tabId) => {
+        window.showTab = (tabId, btn) => {
             document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
             document.getElementById(tabId).style.display = 'block';
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            btn.classList.add('active');
+        };
+
+        // --- OJITO (VER CONTRASEÑA) ---
+        window.togglePass = () => {
+            const passInput = document.getElementById('pass');
+            const eyeIcon = document.getElementById('eye-icon');
+            if (passInput.type === "password") {
+                passInput.type = "text";
+                eyeIcon.textContent = "🙈";
+            } else {
+                passInput.type = "password";
+                eyeIcon.textContent = "👁️";
+            }
         };
 
         // --- AUTH ---
@@ -45,32 +57,31 @@
                 document.getElementById('app-container').style.display = 'block';
                 cargarTodo(user.uid);
             } else {
+                currentUser = null;
                 document.getElementById('login-container').style.display = 'block';
                 document.getElementById('app-container').style.display = 'none';
             }
         });
 
-        // --- FUNCIONES CORE ---
+        // --- CARGAR DATOS ---
         async function cargarTodo(uid) {
-            // Cargar Cuentas para los Selects
+            // Cuentas
             onSnapshot(query(collection(db, "cuentas"), where("uid", "==", uid)), (snap) => {
-                userAccounts = [];
                 const list = document.getElementById('acc-list');
                 const selectPago = document.getElementById('pago-banco');
                 list.innerHTML = '';
-                selectPago.innerHTML = '<option value="">Seleccionar Banco...</option>';
+                selectPago.innerHTML = '<option value="">Elegir Banco...</option>';
                 let total = 0;
                 snap.forEach(d => {
-                    const acc = {id: d.id, ...d.data()};
-                    userAccounts.push(acc);
+                    const acc = d.data();
                     total += acc.saldo;
                     list.innerHTML += `<div class="item"><span>🏦 ${acc.nombre}</span> <b>$${acc.saldo.toFixed(2)}</b></div>`;
-                    selectPago.innerHTML += `<option value="${acc.id}">${acc.nombre} ($${acc.saldo})</option>`;
+                    selectPago.innerHTML += `<option value="${d.id}">${acc.nombre} ($${acc.saldo})</option>`;
                 });
                 document.getElementById('total-cash').textContent = `$${total.toFixed(2)}`;
             });
 
-            // Cargar Proyecciones (Gastos Fijos/Variables)
+            // Proyecciones
             onSnapshot(query(collection(db, "proyecciones"), where("uid", "==", uid)), (snap) => {
                 const list = document.getElementById('proj-list');
                 list.innerHTML = '';
@@ -78,7 +89,7 @@
                     const p = d.data();
                     list.innerHTML += `<div class="item">
                         <div><b>${p.nombre}</b><br><small>Vence: ${p.fecha}</small></div>
-                        <div>$${p.monto} <button onclick="abrirPago('${d.id}', ${p.monto}, 'proyeccion')" class="btn-pay">Pagar</button></div>
+                        <div>$${p.monto} <button onclick="abrirPago('${d.id}', ${p.monto})" class="btn-pay">Pagar</button></div>
                     </div>`;
                 });
             });
@@ -88,20 +99,27 @@
         window.crearCuenta = async () => {
             const nombre = document.getElementById('new-acc-name').value;
             const saldo = parseFloat(document.getElementById('new-acc-saldo').value);
-            if(nombre && saldo >= 0) await addDoc(collection(db, "cuentas"), { uid: currentUser.uid, nombre, saldo });
+            if(nombre && !isNaN(saldo)) {
+                await addDoc(collection(db, "cuentas"), { uid: currentUser.uid, nombre, saldo });
+                document.getElementById('new-acc-name').value = '';
+                document.getElementById('new-acc-saldo').value = '';
+            }
         };
 
         window.crearProyeccion = async () => {
             const nombre = document.getElementById('proj-name').value;
             const monto = parseFloat(document.getElementById('proj-monto').value);
             const fecha = document.getElementById('proj-fecha').value;
-            if(nombre && monto) await addDoc(collection(db, "proyecciones"), { uid: currentUser.uid, nombre, monto, fecha });
+            if(nombre && monto) {
+                await addDoc(collection(db, "proyecciones"), { uid: currentUser.uid, nombre, monto, fecha });
+                document.getElementById('proj-name').value = '';
+                document.getElementById('proj-monto').value = '';
+            }
         };
 
-        // Modal de Pago
         let itemAPagar = null;
-        window.abrirPago = (id, monto, tipo) => {
-            itemAPagar = {id, monto, tipo};
+        window.abrirPago = (id, monto) => {
+            itemAPagar = {id, monto};
             document.getElementById('modal-pago').style.display = 'flex';
             document.getElementById('monto-real').value = monto;
         };
@@ -109,16 +127,14 @@
         window.confirmarPago = async () => {
             const bancoId = document.getElementById('pago-banco').value;
             const montoReal = parseFloat(document.getElementById('monto-real').value);
-            if(!bancoId) return alert("Elige un banco");
+            if(!bancoId) return alert("Selecciona un banco");
 
             const bancoRef = doc(db, "cuentas", bancoId);
-            const bancoSnap = await getDoc(bancoRef);
-            await updateDoc(bancoRef, { saldo: bancoSnap.data().saldo - montoReal });
-            
-            if(itemAPagar.tipo === 'proyeccion') await deleteDoc(doc(db, "proyecciones", itemAPagar.id));
+            const snap = await getDoc(bancoRef);
+            await updateDoc(bancoRef, { saldo: snap.data().saldo - montoReal });
+            await deleteDoc(doc(db, "proyecciones", itemAPagar.id));
             
             document.getElementById('modal-pago').style.display = 'none';
-            alert("Pago procesado y descontado del banco.");
         };
 
         window.login = () => signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value);
@@ -127,84 +143,90 @@
     </script>
 
     <style>
-        :root { --gold: #d4af37; --bg: #121212; --card: #1e1e1e; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 80px; }
-        .card { background: var(--card); margin: 15px; padding: 20px; border-radius: 15px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        h2 { color: var(--gold); text-align: center; margin-top: 0; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box;}
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
-        .btn-gold { background: var(--gold); color: black; }
-        .btn-pay { background: #2e7d32; color: white; width: auto; padding: 5px 15px; }
-        .total-box { text-align: center; border: 2px solid var(--gold); padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        .total-box span { font-size: 2.5em; color: var(--gold); font-weight: bold; }
-        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #333; }
-        
-        /* Nav Bar */
-        .nav-bar { position: fixed; bottom: 0; width: 100%; background: #000; display: flex; border-top: 1px solid var(--gold); }
-        .nav-btn { flex: 1; padding: 15px; text-align: center; color: #888; font-size: 0.8em; }
-        .nav-btn.active { color: var(--gold); font-weight: bold; }
-        
-        /* Modal */
-        #modal-pago { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
+        :root { --gold: #d4af37; --bg: #000; --card: #1a1a1a; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 90px; }
+        .card { background: var(--card); margin: 15px; padding: 20px; border-radius: 15px; border: 1px solid #333; }
+        h2 { color: var(--gold); text-align: center; margin-bottom: 20px; letter-spacing: 2px; }
+        .input-group { position: relative; margin-bottom: 15px; }
+        input, select { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box; }
+        .eye-btn { position: absolute; right: 12px; top: 12px; cursor: pointer; font-size: 1.2em; background:none; border:none; color:#888; width:auto; padding:0; }
+        button { width: 100%; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn-gold { background: var(--gold); color: black; margin-top: 10px; }
+        .btn-pay { background: #2e7d32; color: white; width: auto; padding: 6px 12px; font-size: 0.8em; }
+        .total-box { text-align: center; border: 2px solid var(--gold); padding: 15px; border-radius: 12px; background: #0a0a0a; margin-bottom: 20px; }
+        .total-box span { font-size: 2.2em; color: var(--gold); font-weight: bold; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #333; }
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: #111; display: flex; border-top: 1px solid #333; padding: 5px 0; }
+        .nav-btn { flex: 1; text-align: center; color: #666; font-size: 0.7em; cursor: pointer; }
+        .nav-btn.active { color: var(--gold); }
+        .nav-btn i { font-size: 1.8em; display: block; margin-bottom: 2px; }
+        #modal-pago { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.95); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
     </style>
 </head>
 <body>
 
-    <div id="login-container" style="padding: 50px 20px;">
-        <h2>PROYECCIONES APP</h2>
-        <input type="email" id="email" placeholder="Correo">
-        <input type="password" id="pass" placeholder="Contraseña">
-        <button onclick="login()" class="btn-gold">ENTRAR</button>
+    <div id="login-container" style="padding: 80px 30px;">
+        <div style="text-align: center; margin-bottom: 40px;">
+            <img src="logo.png" style="width: 120px; border-radius: 50%; border: 2px solid var(--gold);">
+            <h2>PROYECCIONES APP</h2>
+        </div>
+        <div class="input-group">
+            <input type="email" id="email" placeholder="Correo electrónico">
+        </div>
+        <div class="input-group">
+            <input type="password" id="pass" placeholder="Contraseña">
+            <button class="eye-btn" id="eye-icon" onclick="togglePass()">👁️</button>
+        </div>
+        <button onclick="login()" class="btn-gold">INICIAR SESIÓN</button>
     </div>
 
     <div id="app-container" style="display:none;">
         
         <div id="tab-saldos" class="tab-content">
             <div class="card">
-                <h2>BÓVEDA REAL</h2>
+                <h2>MI BÓVEDA</h2>
                 <div class="total-box">
-                    <p>TOTAL DISPONIBLE</p>
+                    <p style="margin:0; font-size: 0.8em; color:#888;">TOTAL DISPONIBLE</p>
                     <span id="total-cash">$0.00</span>
                 </div>
-                <h4>Cuentas Bancarias</h4>
                 <div id="acc-list"></div>
-                <hr>
-                <input type="text" id="new-acc-name" placeholder="Nombre Banco (ej: Pichincha)">
-                <input type="number" id="new-acc-saldo" placeholder="Saldo Inicial">
-                <button onclick="crearCuenta()" class="btn-gold">+ REGISTRAR CUENTA</button>
+                <hr style="border:0; border-top:1px solid #333; margin:20px 0;">
+                <input type="text" id="new-acc-name" placeholder="Nombre de Cuenta / Banco">
+                <input type="number" id="new-acc-saldo" placeholder="Saldo Inicial $">
+                <button onclick="crearCuenta()" class="btn-gold">+ REGISTRAR BANCO</button>
             </div>
         </div>
 
         <div id="tab-proyeccion" class="tab-content" style="display:none;">
             <div class="card">
-                <h2>PROYECCIÓN DEL MES</h2>
-                <p style="font-size: 0.8em; text-align:center;">Planifica tus pagos antes de que lleguen</p>
+                <h2>PROYECCIÓN</h2>
                 <div id="proj-list"></div>
-                <hr>
-                <h4>Nueva Proyección</h4>
-                <input type="text" id="proj-name" placeholder="Nombre (ej: Arriendo, Internet)">
-                <input type="number" id="proj-monto" placeholder="Monto proyectado $">
+                <hr style="border:0; border-top:1px solid #333; margin:20px 0;">
+                <h4>Nuevo Gasto Proyectado</h4>
+                <input type="text" id="proj-name" placeholder="Ej: Arriendo, Plan Celular">
+                <input type="number" id="proj-monto" placeholder="Monto estimado $">
                 <input type="date" id="proj-fecha">
-                <button onclick="crearProyeccion()" class="btn-gold">+ AGREGAR AL PLAN</button>
+                <button onclick="crearProyeccion()" class="btn-gold">+ AGREGAR PLAN</button>
             </div>
         </div>
 
         <div class="nav-bar">
-            <div class="nav-btn active" onclick="showTab('tab-saldos')">🏦<br>SALDOS</div>
-            <div class="nav-btn" onclick="showTab('tab-proyeccion')">📅<br>PROYECCIÓN</div>
-            <div class="nav-btn" onclick="logout()">🚪<br>SALIR</div>
+            <div class="nav-btn active" onclick="showTab('tab-saldos', this)"><span>🏦</span><br>SALDOS</div>
+            <div class="nav-btn" onclick="showTab('tab-proyeccion', this)"><span>📅</span><br>PLAN</div>
+            <div class="nav-btn" onclick="logout()"><span>🚪</span><br>SALIR</div>
         </div>
     </div>
 
     <div id="modal-pago">
-        <div class="card" style="width: 80%;">
-            <h3>Confirmar Pago</h3>
-            <label>¿De qué banco sale el dinero?</label>
-            <select id="pago-banco"></select>
-            <label>¿Cuánto pagaste finalmente? (Ajuste Real)</label>
+        <div class="card" style="width: 85%;">
+            <h3>Procesar Pago</h3>
+            <label style="font-size: 0.8em; color: #888;">¿De dónde sale el dinero?</label>
+            <select id="pago-banco" style="margin-top:5px;"></select>
+            <br><br>
+            <label style="font-size: 0.8em; color: #888;">Monto final pagado:</label>
             <input type="number" id="monto-real" step="0.01">
-            <button onclick="confirmarPago()" class="btn-gold">FINALIZAR PAGO</button>
-            <button onclick="document.getElementById('modal-pago').style.display='none'" style="background:transparent; color:gray;">Cancelar</button>
+            <button onclick="confirmarPago()" class="btn-gold">CONFIRMAR Y DESCONTAR</button>
+            <button onclick="document.getElementById('modal-pago').style.display='none'" style="background:transparent; color:gray; margin-top:10px;">Cancelar</button>
         </div>
     </div>
 
