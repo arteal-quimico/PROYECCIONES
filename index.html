@@ -63,10 +63,10 @@
             }
         });
 
-        // --- CARGAR DATOS ---
+        // --- CARGAR DATOS (FUNCIONES CORREGIDAS) ---
         async function cargarTodo(uid) {
-            // Cuentas
-            onSnapshot(query(collection(db, "cuentas"), where("uid", "==", uid)), (snap) => {
+            // CARGAR CUENTAS BANCARIAS
+            onSnapshot(query(collection(db, "cuentas_bancarias"), where("usuarioId", "==", uid)), (snap) => {
                 const list = document.getElementById('acc-list');
                 const selectPago = document.getElementById('pago-banco');
                 list.innerHTML = '';
@@ -81,40 +81,55 @@
                 document.getElementById('total-cash').textContent = `$${total.toFixed(2)}`;
             });
 
-            // Proyecciones
-            onSnapshot(query(collection(db, "proyecciones"), where("uid", "==", uid)), (snap) => {
+            // CARGAR PROYECCIONES
+            onSnapshot(query(collection(db, "proyecciones"), where("usuarioId", "==", uid)), (snap) => {
                 const list = document.getElementById('proj-list');
                 list.innerHTML = '';
                 snap.forEach(d => {
                     const p = d.data();
                     list.innerHTML += `<div class="item">
                         <div><b>${p.nombre}</b><br><small>Vence: ${p.fecha}</small></div>
-                        <div>$${p.monto} <button onclick="abrirPago('${d.id}', ${p.monto})" class="btn-pay">Pagar</button></div>
+                        <div>$${p.monto.toFixed(2)} <button onclick="abrirPago('${d.id}', ${p.monto})" class="btn-pay">Pagar</button></div>
                     </div>`;
                 });
             });
         }
 
-        // --- ACCIONES ---
+        // --- ACCIONES DE REGISTRO ---
         window.crearCuenta = async () => {
             const nombre = document.getElementById('new-acc-name').value;
             const saldo = parseFloat(document.getElementById('new-acc-saldo').value);
             if(nombre && !isNaN(saldo)) {
-                await addDoc(collection(db, "cuentas"), { uid: currentUser.uid, nombre, saldo });
-                document.getElementById('new-acc-name').value = '';
-                document.getElementById('new-acc-saldo').value = '';
-            }
+                try {
+                    await addDoc(collection(db, "cuentas_bancarias"), { 
+                        usuarioId: currentUser.uid, 
+                        nombre: nombre, 
+                        saldo: saldo,
+                        fechaCreacion: new Date()
+                    });
+                    document.getElementById('new-acc-name').value = '';
+                    document.getElementById('new-acc-saldo').value = '';
+                } catch(e) { alert("Error al guardar: " + e.message); }
+            } else { alert("Ingresa nombre y saldo válido"); }
         };
 
         window.crearProyeccion = async () => {
             const nombre = document.getElementById('proj-name').value;
             const monto = parseFloat(document.getElementById('proj-monto').value);
             const fecha = document.getElementById('proj-fecha').value;
-            if(nombre && monto) {
-                await addDoc(collection(db, "proyecciones"), { uid: currentUser.uid, nombre, monto, fecha });
-                document.getElementById('proj-name').value = '';
-                document.getElementById('proj-monto').value = '';
-            }
+            if(nombre && !isNaN(monto)) {
+                try {
+                    await addDoc(collection(db, "proyecciones"), { 
+                        usuarioId: currentUser.uid, 
+                        nombre: nombre, 
+                        monto: monto, 
+                        fecha: fecha,
+                        fechaCreacion: new Date()
+                    });
+                    document.getElementById('proj-name').value = '';
+                    document.getElementById('proj-monto').value = '';
+                } catch(e) { alert("Error al proyectar: " + e.message); }
+            } else { alert("Ingresa nombre y monto válido"); }
         };
 
         let itemAPagar = null;
@@ -129,15 +144,20 @@
             const montoReal = parseFloat(document.getElementById('monto-real').value);
             if(!bancoId) return alert("Selecciona un banco");
 
-            const bancoRef = doc(db, "cuentas", bancoId);
-            const snap = await getDoc(bancoRef);
-            await updateDoc(bancoRef, { saldo: snap.data().saldo - montoReal });
-            await deleteDoc(doc(db, "proyecciones", itemAPagar.id));
-            
-            document.getElementById('modal-pago').style.display = 'none';
+            try {
+                const bancoRef = doc(db, "cuentas_bancarias", bancoId);
+                const snap = await getDoc(bancoRef);
+                await updateDoc(bancoRef, { saldo: snap.data().saldo - montoReal });
+                await deleteDoc(doc(db, "proyecciones", itemAPagar.id));
+                document.getElementById('modal-pago').style.display = 'none';
+            } catch(e) { alert("Error al procesar pago: " + e.message); }
         };
 
-        window.login = () => signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value);
+        window.login = () => {
+            const email = document.getElementById('email').value;
+            const pass = document.getElementById('pass').value;
+            signInWithEmailAndPassword(auth, email, pass).catch(error => alert("Error: " + error.message));
+        };
         window.logout = () => signOut(auth);
 
     </script>
@@ -159,7 +179,7 @@
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: #111; display: flex; border-top: 1px solid #333; padding: 5px 0; }
         .nav-btn { flex: 1; text-align: center; color: #666; font-size: 0.7em; cursor: pointer; }
         .nav-btn.active { color: var(--gold); }
-        .nav-btn i { font-size: 1.8em; display: block; margin-bottom: 2px; }
+        .nav-btn span { font-size: 1.8em; display: block; margin-bottom: 2px; }
         #modal-pago { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.95); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
     </style>
 </head>
