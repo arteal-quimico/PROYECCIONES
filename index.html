@@ -4,17 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Proyecciones App</title>
-    
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="logo.png">
     <meta name="theme-color" content="#d4af37">
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, updateDoc, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
-        // Tus claves reales
         const firebaseConfig = {
             apiKey: "AIzaSyAy0pcPg5nF1cQNlSBLG_5JJvgJij0aswM",
             authDomain: "presupuesto-45e0c.firebaseapp.com",
@@ -28,140 +26,186 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // UI Elements
-        const loginContainer = document.getElementById('login-container');
-        const dashboardContainer = document.getElementById('dashboard-container');
-        const userEmailDisplay = document.getElementById('user-email');
-        const accountsList = document.getElementById('accounts-list');
-        const totalBalanceDisplay = document.getElementById('total-balance');
-
         let currentUser = null;
+        let userAccounts = [];
 
-        // Autenticación
+        // --- NAVEGACIÓN ---
+        window.showTab = (tabId) => {
+            document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+            document.getElementById(tabId).style.display = 'block';
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        };
+
+        // --- AUTH ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 currentUser = user;
-                loginContainer.style.display = 'none';
-                dashboardContainer.style.display = 'block';
-                userEmailDisplay.textContent = user.email;
-                cargarDatos(user.uid); 
+                document.getElementById('login-container').style.display = 'none';
+                document.getElementById('app-container').style.display = 'block';
+                cargarTodo(user.uid);
             } else {
-                currentUser = null;
-                loginContainer.style.display = 'block';
-                dashboardContainer.style.display = 'none';
+                document.getElementById('login-container').style.display = 'block';
+                document.getElementById('app-container').style.display = 'none';
             }
         });
 
-        document.getElementById('btn-login').addEventListener('click', () => {
-            signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)
-                .catch(error => alert("Error: " + error.message));
-        });
-
-        document.getElementById('btn-register').addEventListener('click', () => {
-            createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value)
-                .then(() => alert("¡Registrado!"))
-                .catch(error => alert("Error: " + error.message));
-        });
-
-        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
-
-        // Ver Contraseña
-        document.getElementById('toggle-password').addEventListener('click', function () {
-            const pwd = document.getElementById('password');
-            pwd.type = pwd.type === 'password' ? 'text' : 'password';
-            this.textContent = pwd.type === 'password' ? '👁️' : '🙈';
-        });
-
-        // Guardar Cuenta / Banco
-        document.getElementById('btn-add-account').addEventListener('click', async () => {
-            const nombre = document.getElementById('account-name').value;
-            const saldo = parseFloat(document.getElementById('account-balance').value);
-            if (nombre && !isNaN(saldo)) {
-                await addDoc(collection(db, "cuentas_bancarias"), { usuarioId: currentUser.uid, nombre, saldo });
-                document.getElementById('account-name').value = '';
-                document.getElementById('account-balance').value = '';
-            }
-        });
-
-        // Cargar Datos en Tiempo Real
-        function cargarDatos(uid) {
-            const q = query(collection(db, "cuentas_bancarias"), where("usuarioId", "==", uid));
-            onSnapshot(q, (snapshot) => {
-                accountsList.innerHTML = '';
+        // --- FUNCIONES CORE ---
+        async function cargarTodo(uid) {
+            // Cargar Cuentas para los Selects
+            onSnapshot(query(collection(db, "cuentas"), where("uid", "==", uid)), (snap) => {
+                userAccounts = [];
+                const list = document.getElementById('acc-list');
+                const selectPago = document.getElementById('pago-banco');
+                list.innerHTML = '';
+                selectPago.innerHTML = '<option value="">Seleccionar Banco...</option>';
                 let total = 0;
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    total += data.saldo;
-                    accountsList.innerHTML += `<li class="list-item"><span>🏦 ${data.nombre}</span> <strong>$${data.saldo.toFixed(2)}</strong></li>`;
+                snap.forEach(d => {
+                    const acc = {id: d.id, ...d.data()};
+                    userAccounts.push(acc);
+                    total += acc.saldo;
+                    list.innerHTML += `<div class="item"><span>🏦 ${acc.nombre}</span> <b>$${acc.saldo.toFixed(2)}</b></div>`;
+                    selectPago.innerHTML += `<option value="${acc.id}">${acc.nombre} ($${acc.saldo})</option>`;
                 });
-                totalBalanceDisplay.textContent = `$${total.toFixed(2)}`;
+                document.getElementById('total-cash').textContent = `$${total.toFixed(2)}`;
+            });
+
+            // Cargar Proyecciones (Gastos Fijos/Variables)
+            onSnapshot(query(collection(db, "proyecciones"), where("uid", "==", uid)), (snap) => {
+                const list = document.getElementById('proj-list');
+                list.innerHTML = '';
+                snap.forEach(d => {
+                    const p = d.data();
+                    list.innerHTML += `<div class="item">
+                        <div><b>${p.nombre}</b><br><small>Vence: ${p.fecha}</small></div>
+                        <div>$${p.monto} <button onclick="abrirPago('${d.id}', ${p.monto}, 'proyeccion')" class="btn-pay">Pagar</button></div>
+                    </div>`;
+                });
             });
         }
+
+        // --- ACCIONES ---
+        window.crearCuenta = async () => {
+            const nombre = document.getElementById('new-acc-name').value;
+            const saldo = parseFloat(document.getElementById('new-acc-saldo').value);
+            if(nombre && saldo >= 0) await addDoc(collection(db, "cuentas"), { uid: currentUser.uid, nombre, saldo });
+        };
+
+        window.crearProyeccion = async () => {
+            const nombre = document.getElementById('proj-name').value;
+            const monto = parseFloat(document.getElementById('proj-monto').value);
+            const fecha = document.getElementById('proj-fecha').value;
+            if(nombre && monto) await addDoc(collection(db, "proyecciones"), { uid: currentUser.uid, nombre, monto, fecha });
+        };
+
+        // Modal de Pago
+        let itemAPagar = null;
+        window.abrirPago = (id, monto, tipo) => {
+            itemAPagar = {id, monto, tipo};
+            document.getElementById('modal-pago').style.display = 'flex';
+            document.getElementById('monto-real').value = monto;
+        };
+
+        window.confirmarPago = async () => {
+            const bancoId = document.getElementById('pago-banco').value;
+            const montoReal = parseFloat(document.getElementById('monto-real').value);
+            if(!bancoId) return alert("Elige un banco");
+
+            const bancoRef = doc(db, "cuentas", bancoId);
+            const bancoSnap = await getDoc(bancoRef);
+            await updateDoc(bancoRef, { saldo: bancoSnap.data().saldo - montoReal });
+            
+            if(itemAPagar.tipo === 'proyeccion') await deleteDoc(doc(db, "proyecciones", itemAPagar.id));
+            
+            document.getElementById('modal-pago').style.display = 'none';
+            alert("Pago procesado y descontado del banco.");
+        };
+
+        window.login = () => signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('pass').value);
+        window.logout = () => signOut(auth);
+
     </script>
 
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; margin: 0; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; color: #fff; padding-top: 20px; }
-        .card { background: #262626; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(212,175,55,0.15); width: 90%; max-width: 400px; margin-bottom: 20px; }
-        .input-group { position: relative; margin: 10px 0; }
-        input, select { width: 100%; padding: 12px; background: #333; color: white; border: 1px solid #d4af37; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; }
-        .eye-icon { position: absolute; right: 10px; top: 40%; transform: translateY(-50%); cursor: pointer; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px; text-transform: uppercase;}
-        .btn-primary { background-color: #d4af37; color: #000; }
-        .btn-secondary { background-color: #444; color: #d4af37; border: 1px solid #d4af37;}
-        .btn-danger { background-color: #8b0000; color: white; }
-        h2, h4 { color: #d4af37; text-align: center; margin-top: 0;}
-        .total-box { background: #000; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #d4af37;}
-        .total-box h3 { margin: 0; color: #d4af37; font-size: 2.2em; }
-        .flex-row { display: flex; gap: 10px; }
-        ul { list-style: none; padding: 0; }
-        .list-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #444; background: #333; border-radius: 6px; margin-bottom: 5px;}
+        :root { --gold: #d4af37; --bg: #121212; --card: #1e1e1e; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; margin: 0; padding-bottom: 80px; }
+        .card { background: var(--card); margin: 15px; padding: 20px; border-radius: 15px; border: 1px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        h2 { color: var(--gold); text-align: center; margin-top: 0; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; background: #2a2a2a; border: 1px solid #444; color: white; border-radius: 8px; box-sizing: border-box;}
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-gold { background: var(--gold); color: black; }
+        .btn-pay { background: #2e7d32; color: white; width: auto; padding: 5px 15px; }
+        .total-box { text-align: center; border: 2px solid var(--gold); padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .total-box span { font-size: 2.5em; color: var(--gold); font-weight: bold; }
+        .item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #333; }
+        
+        /* Nav Bar */
+        .nav-bar { position: fixed; bottom: 0; width: 100%; background: #000; display: flex; border-top: 1px solid var(--gold); }
+        .nav-btn { flex: 1; padding: 15px; text-align: center; color: #888; font-size: 0.8em; }
+        .nav-btn.active { color: var(--gold); font-weight: bold; }
+        
+        /* Modal */
+        #modal-pago { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.9); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:1000; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="login-container">
+    <div id="login-container" style="padding: 50px 20px;">
         <h2>PROYECCIONES APP</h2>
-        <input type="email" id="email" placeholder="Correo electrónico">
-        <div class="input-group">
-            <input type="password" id="password" placeholder="Contraseña">
-            <span class="eye-icon" id="toggle-password">👁️</span>
-        </div>
-        <button class="btn-primary" id="btn-login">Iniciar Sesión</button>
-        <button class="btn-secondary" id="btn-register">Registrar Usuario</button>
+        <input type="email" id="email" placeholder="Correo">
+        <input type="password" id="pass" placeholder="Contraseña">
+        <button onclick="login()" class="btn-gold">ENTRAR</button>
     </div>
 
-    <div class="card" id="dashboard-container" style="display: none;">
-        <h2>Flujo de Caja</h2>
-        <p style="text-align: center; font-size: 0.8em; color: #aaa;">Bóveda de: <span id="user-email"></span></p>
+    <div id="app-container" style="display:none;">
         
-        <div class="total-box">
-            <p style="margin: 0; font-size: 0.9em;">Balance Total Disponible</p>
-            <h3 id="total-balance">$0.00</h3>
+        <div id="tab-saldos" class="tab-content">
+            <div class="card">
+                <h2>BÓVEDA REAL</h2>
+                <div class="total-box">
+                    <p>TOTAL DISPONIBLE</p>
+                    <span id="total-cash">$0.00</span>
+                </div>
+                <h4>Cuentas Bancarias</h4>
+                <div id="acc-list"></div>
+                <hr>
+                <input type="text" id="new-acc-name" placeholder="Nombre Banco (ej: Pichincha)">
+                <input type="number" id="new-acc-saldo" placeholder="Saldo Inicial">
+                <button onclick="crearCuenta()" class="btn-gold">+ REGISTRAR CUENTA</button>
+            </div>
         </div>
 
-        <h4>Registrar Ingreso</h4>
-        <select id="income-type">
-            <option value="sueldo">Sueldo Base</option>
-            <option value="comisiones">Comisiones</option>
-            <option value="beneficios">Beneficios de Ley</option>
-            <option value="otros">Otros</option>
-        </select>
-        <div class="flex-row">
-            <input type="number" id="income-amount" placeholder="Monto $" step="0.01">
-            <button class="btn-primary">+ Sumar</button>
+        <div id="tab-proyeccion" class="tab-content" style="display:none;">
+            <div class="card">
+                <h2>PROYECCIÓN DEL MES</h2>
+                <p style="font-size: 0.8em; text-align:center;">Planifica tus pagos antes de que lleguen</p>
+                <div id="proj-list"></div>
+                <hr>
+                <h4>Nueva Proyección</h4>
+                <input type="text" id="proj-name" placeholder="Nombre (ej: Arriendo, Internet)">
+                <input type="number" id="proj-monto" placeholder="Monto proyectado $">
+                <input type="date" id="proj-fecha">
+                <button onclick="crearProyeccion()" class="btn-gold">+ AGREGAR AL PLAN</button>
+            </div>
         </div>
-        <hr style="border-color: #444; margin: 20px 0;">
 
-        <h4>Mis Cuentas / Bancos</h4>
-        <div class="flex-row">
-            <input type="text" id="account-name" placeholder="Ej: B. Pichincha" style="flex: 2;">
-            <input type="number" id="account-balance" placeholder="Saldo Inicial" style="flex: 1;" step="0.01">
+        <div class="nav-bar">
+            <div class="nav-btn active" onclick="showTab('tab-saldos')">🏦<br>SALDOS</div>
+            <div class="nav-btn" onclick="showTab('tab-proyeccion')">📅<br>PROYECCIÓN</div>
+            <div class="nav-btn" onclick="logout()">🚪<br>SALIR</div>
         </div>
-        <button class="btn-secondary" id="btn-add-account">Crear Cuenta</button>
-        
-        <ul id="accounts-list"></ul>
+    </div>
 
-        <button class="btn-danger" id="btn-logout" style="margin-top: 30px;">Cerrar Sesión</button>
+    <div id="modal-pago">
+        <div class="card" style="width: 80%;">
+            <h3>Confirmar Pago</h3>
+            <label>¿De qué banco sale el dinero?</label>
+            <select id="pago-banco"></select>
+            <label>¿Cuánto pagaste finalmente? (Ajuste Real)</label>
+            <input type="number" id="monto-real" step="0.01">
+            <button onclick="confirmarPago()" class="btn-gold">FINALIZAR PAGO</button>
+            <button onclick="document.getElementById('modal-pago').style.display='none'" style="background:transparent; color:gray;">Cancelar</button>
+        </div>
     </div>
 
 </body>
