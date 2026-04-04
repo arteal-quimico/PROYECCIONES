@@ -372,6 +372,18 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <div id="lista-deudas"><div class="empty">Sin deudas registradas</div></div>
     </div>
   </div>
+
+
+
+  <nav class="nav-bar">
+    <div class="nav-btn active" id="nav-resumen" onclick="showSec('resumen',this)"><span>🏠</span>Inicio</div>
+    <div class="nav-btn" id="nav-ingresos" onclick="showSec('ingresos',this)"><span>💵</span>Ingresos</div>
+    <div class="nav-btn" id="nav-gastos" onclick="showSec('gastos',this)"><span>📋</span>Gastos</div>
+    <div class="nav-btn" id="nav-bancos" onclick="showSec('bancos',this)"><span>🏦</span>Bancos</div>
+    <div class="nav-btn" id="nav-deudas" onclick="showSec('deudas',this)"><span>💳</span>Deudas</div>
+  </nav>
+</div>
+
 <!-- MODAL PAGO -->
 <div class="modal-overlay" id="modal-pago">
   <div class="modal">
@@ -498,6 +510,8 @@ function actualizarMesTitulo(){
 expose('cambiarMes', dir => {
   mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() + dir, 1);
   actualizarMesTitulo();
+  copiarGastosFijosRecurrentes();
+  copiarGastosVarRecurrentes();
   renderMes();
 });
 
@@ -568,9 +582,61 @@ function renderMes(){
   });
 }
 
+async function copiarGastosFijosRecurrentes(){
+  const mesActualKey = mesKey(mesActual);
+  const snap = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('recurrente','==',true)));
+  const recurrentes = snap.docs.map(d=>({...d.data()}));
+  
+  const existentes = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
+  const conceptos = existentes.docs.map(d=>d.data().concepto);
+  
+  for(const gf of recurrentes){
+    if(!conceptos.includes(gf.concepto)){
+      await addDoc(collection(db,'gastos_fijos'),{
+        uid,
+        concepto: gf.concepto,
+        presupuesto: gf.presupuesto,
+        venc: gf.venc,
+        dia: gf.dia,
+        categoria: gf.categoria,
+        vencLabel: gf.vencLabel,
+        pagado: false,
+        montoReal: null,
+        mesKey: mesActualKey,
+        recurrente: true
+      });
+    }
+  }
+}
+
+async function copiarGastosVarRecurrentes(){
+  const mesActualKey = mesKey(mesActual);
+  const snap = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('recurrente','==',true)));
+  const recurrentes = snap.docs.map(d=>({...d.data()}));
+  
+  const existentes = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
+  const conceptos = existentes.docs.map(d=>d.data().concepto);
+  
+  for(const gv of recurrentes){
+    if(!conceptos.includes(gv.concepto)){
+      await addDoc(collection(db,'gastos_var'),{
+        uid,
+        concepto: gv.concepto,
+        monto: gv.monto,
+        bancoId: gv.bancoId,
+        banco: gv.banco,
+        fecha: hoy(),
+        mesKey: mesActualKey,
+        recurrente: true
+      });
+    }
+  }
+}
+
 let _ing=0,_gf=0,_gv=0,_gu=0;
 function calcRestante(){
-  const total = _ing - _gf - _gv - _gu;
+  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
+  const total = _ing - _gf - _gv - _gu + totalBancos;
   document.getElementById('kpi-res').textContent = $m(total);
   document.getElementById('kpi-res').className = 'kpi-v '+(total>=0?'g':'r');
 }
@@ -794,7 +860,7 @@ expose('addGastoFijo', async () => {
   const categoria = document.getElementById('gf-cat').value;
   if(!concepto||isNaN(presupuesto)||presupuesto<=0){ alert('Completa los campos'); return; }
   let vencLabel = venc==='quincena'?'Quincena (día 15)':venc==='fin_mes'?'Fin de mes':`Día ${dia||'?'} del mes`;
-  await addDoc(collection(db,'gastos_fijos'),{uid,concepto,presupuesto,venc,dia,categoria,vencLabel,pagado:false,montoReal:null,mesKey:mesKey(mesActual)});
+  await addDoc(collection(db,'gastos_fijos'),{uid,concepto,presupuesto,venc,dia,categoria,vencLabel,pagado:false,montoReal:null,mesKey:mesKey(mesActual),recurrente:true});
   document.getElementById('gf-concepto').value='';
   document.getElementById('gf-monto').value='';
 });
@@ -806,7 +872,7 @@ expose('addGastoVar', async () => {
   const fecha = document.getElementById('gv-fecha').value || hoy();
   if(!concepto||isNaN(monto)||monto<=0){ alert('Completa los campos'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
-  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual)});
+  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),recurrente:true});
   if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
   document.getElementById('gv-concepto').value='';
   document.getElementById('gv-monto').value='';
@@ -975,6 +1041,10 @@ expose('cerrarModal', id => {
 document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); });
 });
+
+// IA ASESOR ELIMINADO
+
+
 </script>
 
 <script>
