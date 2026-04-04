@@ -287,6 +287,15 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
     </div>
     <!-- GASTOS FIJOS -->
     <div id="sub-fijos">
+      <div class="card" style="background:linear-gradient(135deg,#1a1200,#0f1a0a);border-color:var(--gold3)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="card-tt" style="margin-bottom:2px">📋 Proyectar desde Mes Anterior</div>
+            <div style="font-size:11px;color:var(--t3)">Copia fijos y variables del mes pasado como pendientes</div>
+          </div>
+          <button class="btn-add" onclick="proyectarDesdeMesAnterior()" style="white-space:nowrap">📋 Proyectar</button>
+        </div>
+      </div>
       <div class="card">
         <div class="card-tt">Agregar Gasto Fijo</div>
         <div class="form-row">
@@ -593,11 +602,9 @@ function actualizarMesTitulo(){
   document.getElementById('mes-titulo').textContent = mesNombre(mesActual);
 }
 
-expose('cambiarMes', async dir => {
+expose('cambiarMes', dir => {
   mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() + dir, 1);
   actualizarMesTitulo();
-  await copiarGastosFijosRecurrentes();
-  await copiarGastosVarRecurrentes();
   renderMes();
 });
 
@@ -669,33 +676,63 @@ function renderMes(){
   });
 }
 
-async function copiarGastosFijosRecurrentes(){
+async function proyectarDesdeMesAnterior(){
   const mesActualKey = mesKey(mesActual);
-  const snap = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('recurrente','==',true)));
-  const recurrentes = snap.docs.map(d=>({...d.data()}));
-  
-  const existentes = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
-  const conceptos = existentes.docs.map(d=>d.data().concepto);
-  
-  for(const gf of recurrentes){
-    if(!conceptos.includes(gf.concepto)){
-      await addDoc(collection(db,'gastos_fijos'),{
-        uid,
-        concepto: gf.concepto,
-        presupuesto: gf.presupuesto,
-        venc: gf.venc,
-        dia: gf.dia,
-        categoria: gf.categoria,
-        vencLabel: gf.vencLabel,
-        pagado: false,
-        montoReal: null,
-        mesKey: mesActualKey,
-        recurrente: true
-      });
-    }
-  }
-  
+  const mesAnterior = new Date(mesActual.getFullYear(), mesActual.getMonth() - 1, 1);
+  const mesAnteriorKey = mesKey(mesAnterior);
 
+  // Verificar si el mes actual ya tiene gastos
+  const existFijos = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
+  const existVar = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
+  if(existFijos.docs.length > 0 || existVar.docs.length > 0){
+    alert('Este mes ya tiene gastos proyectados.');
+    return;
+  }
+
+  // Obtener gastos del mes anterior
+  const fijosMesAnt = await getDocs(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('mesKey','==',mesAnteriorKey)));
+  const varMesAnt = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('mesKey','==',mesAnteriorKey)));
+
+  if(fijosMesAnt.empty && varMesAnt.empty){
+    alert('El mes anterior no tiene datos para proyectar.');
+    return;
+  }
+
+  // Copiar gastos fijos como no pagados
+  for(const d of fijosMesAnt.docs){
+    const g = d.data();
+    await addDoc(collection(db,'gastos_fijos'),{
+      uid,
+      concepto: g.concepto,
+      presupuesto: g.presupuesto,
+      venc: g.venc,
+      dia: g.dia,
+      categoria: g.categoria,
+      vencLabel: g.vencLabel,
+      pagado: false,
+      montoReal: null,
+      mesKey: mesActualKey
+    });
+  }
+
+  // Copiar gastos variables como no confirmados (excepto abonos a deudas)
+  for(const d of varMesAnt.docs){
+    const g = d.data();
+    if(g.esAbono) continue;
+    await addDoc(collection(db,'gastos_var'),{
+      uid,
+      concepto: g.concepto,
+      monto: g.monto,
+      bancoId: g.bancoId||'',
+      banco: g.banco||'',
+      fecha: hoy(),
+      mesKey: mesActualKey,
+      confirmado: false,
+      montoReal: null
+    });
+  }
+
+  alert('✅ Proyección lista. Ajusta lo que haya cambiado.');
 }
 
 async function crearIngresoSobrante(){
@@ -767,36 +804,12 @@ expose('trasladarSaldoSiguienteMes', async () => {
   // Cambiar al siguiente mes
   mesActual = mesProximo;
   actualizarMesTitulo();
-  await copiarGastosFijosRecurrentes();
-  await copiarGastosVarRecurrentes();
   renderMes();
   
   alert('✅ Saldo trasladado como ingreso pendiente. Mes avanzado.');
 });
 
-async function copiarGastosVarRecurrentes(){
-  const mesActualKey = mesKey(mesActual);
-  const snap = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('recurrente','==',true)));
-  const recurrentes = snap.docs.map(d=>({...d.data()}));
-  
-  const existentes = await getDocs(query(collection(db,'gastos_var'),where('uid','==',uid),where('mesKey','==',mesActualKey)));
-  const conceptos = existentes.docs.map(d=>d.data().concepto);
-  
-  for(const gv of recurrentes){
-    if(!conceptos.includes(gv.concepto)){
-      await addDoc(collection(db,'gastos_var'),{
-        uid,
-        concepto: gv.concepto,
-        monto: gv.monto,
-        bancoId: gv.bancoId,
-        banco: gv.banco,
-        fecha: hoy(),
-        mesKey: mesActualKey,
-        recurrente: true
-      });
-    }
-  }
-}
+
 
 let _ing=0,_gf=0,_gv=0,_gu=0;
 let _ing_total=0,_gf_total=0,_gv_total=0,_gu_total=0;
@@ -1087,7 +1100,7 @@ expose('addGastoFijo', async () => {
   const categoria = document.getElementById('gf-cat').value;
   if(!concepto||isNaN(presupuesto)||presupuesto<=0){ alert('Completa los campos'); return; }
   let vencLabel = venc==='quincena'?'Quincena (día 15)':venc==='fin_mes'?'Fin de mes':`Día ${dia||'?'} del mes`;
-  await addDoc(collection(db,'gastos_fijos'),{uid,concepto,presupuesto,venc,dia,categoria,vencLabel,pagado:false,montoReal:null,mesKey:mesKey(mesActual),recurrente:true});
+  await addDoc(collection(db,'gastos_fijos'),{uid,concepto,presupuesto,venc,dia,categoria,vencLabel,pagado:false,montoReal:null,mesKey:mesKey(mesActual)});
   document.getElementById('gf-concepto').value='';
   document.getElementById('gf-monto').value='';
 });
@@ -1099,7 +1112,7 @@ expose('addGastoVar', async () => {
   const fecha = document.getElementById('gv-fecha').value || hoy();
   if(!concepto||isNaN(monto)||monto<=0){ alert('Completa los campos'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
-  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),confirmado:false,montoReal:null,recurrente:true});
+  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),confirmado:false,montoReal:null});
   document.getElementById('gv-concepto').value='';
   document.getElementById('gv-monto').value='';
 });
@@ -1417,7 +1430,7 @@ function actualizarSelectDeudas(){
   el.innerHTML = '<option value="">-- Seleccionar --</option>' + deudasCache.map(d=>`<option value="${d.id}">${d.nombre} (${$m(d.saldoActual)})</option>`).join('');
 }
 
-expose('cerrarModal', id => {
+expose('proyectarDesdeMesAnterior', proyectarDesdeMesAnterior);
   document.getElementById(id).classList.remove('open');
 });
 
