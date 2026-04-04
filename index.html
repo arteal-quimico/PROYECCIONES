@@ -204,13 +204,7 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <div class="card-tt">💳 Mis Deudas</div>
       <div id="res-deudas"><div class="empty">Sin deudas registradas</div></div>
     </div>
-    <div class="card">
-      <div class="card-hd">
-        <div class="card-tt">📤 Trasladar Saldo</div>
-      </div>
-      <p style="font-size:12px;color:var(--t3);margin-bottom:12px">Registra el saldo actual del banco como ingreso del próximo mes y avanza automáticamente.</p>
-      <button class="btn-add" onclick="trasladarSaldoSiguienteMes()" style="width:100%">📤 Trasladar a Siguiente Mes</button>
-    </div>
+
     <div class="card">
       <div class="card-tt">📊 Análisis: Proyectado vs Real</div>
       <div style="margin-bottom:12px">
@@ -741,77 +735,7 @@ async function proyectarDesdeMesAnterior(){
   alert('✅ Proyección lista. Ajusta lo que haya cambiado.');
 }
 
-async function crearIngresoSobrante(){
-  const mesActualKey = mesKey(mesActual);
-  
-  // Verificar si ya existe ingreso de sobrante para este mes
-  const existentes = await getDocs(query(collection(db,'ingresos'),where('uid','==',uid),where('mesKey','==',mesActualKey),where('concepto','==','Sobrante Mes Anterior')));
-  if(existentes.docs.length > 0) return; // Ya existe
-  
-  // Obtener saldo total de todos los bancos
-  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
-  
-  if(totalBancos > 0){
-    // Crear ingreso de sobrante como recibido automáticamente
-    await addDoc(collection(db,'ingresos'),{
-      uid,
-      concepto: 'Sobrante Mes Anterior',
-      monto: totalBancos,
-      montoReal: totalBancos,
-      tipo: 'sobrante',
-      bancoId: '',
-      banco: 'Saldo Inicial',
-      fecha: hoy(),
-      mesKey: mesActualKey,
-      recibido: true  // Ya está recibido
-    });
-  }
-}
 
-expose('trasladarSaldoSiguienteMes', async () => {
-  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
-  
-  if(totalBancos <= 0){
-    alert('No hay saldo para trasladar');
-    return;
-  }
-  
-  if(!confirm(`¿Trasladar $${totalBancos.toFixed(2)} al siguiente mes como ingreso?`)) return;
-  
-  // Calcular el mes siguiente
-  const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
-  const mesPróximoKey = mesKey(mesProximo);
-  
-  // Verificar si ya existe sobrante para ese mes (evitar duplicado)
-  const existente = await getDocs(query(collection(db,'ingresos'),where('uid','==',uid),where('mesKey','==',mesPróximoKey),where('concepto','==','Sobrante Mes Anterior')));
-  if(existente.docs.length > 0){
-    alert('Ya existe un sobrante registrado para el siguiente mes.');
-    mesActual = mesProximo;
-    actualizarMesTitulo();
-    renderMes();
-    return;
-  }
-  
-  // Crear ingreso de sobrante en el mes siguiente como PENDIENTE
-  await addDoc(collection(db,'ingresos'),{
-    uid,
-    concepto: 'Sobrante Mes Anterior',
-    monto: totalBancos,
-    tipo: 'sobrante',
-    bancoId: '',
-    banco: 'Saldo Inicial',
-    fecha: hoy(),
-    mesKey: mesPróximoKey,
-    recibido: false  // PENDIENTE
-  });
-  
-  // Cambiar al siguiente mes
-  mesActual = mesProximo;
-  actualizarMesTitulo();
-  renderMes();
-  
-  alert('✅ Saldo trasladado como ingreso pendiente. Mes avanzado.');
-});
 
 
 
