@@ -642,21 +642,27 @@ function calcRestante(){
 }
 
 function renderIngresos(items){
-  _ing = items.reduce((a,i)=>a+i.monto,0);
+  _ing = items.filter(i=>i.recibido).reduce((a,i)=>a+(i.montoReal||i.monto),0);
   document.getElementById('kpi-ing').textContent = $m(_ing);
   const el = document.getElementById('lista-ingresos');
   if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos este mes</div>'; return; }
-  el.innerHTML = items.map(i=>`
-    <div class="item-row">
+  el.innerHTML = items.map(i=>{
+    const badge = i.recibido ? `<span class="item-badge badge-ok">Recibido</span>` : `<span class="item-badge badge-pen">Pendiente</span>`;
+    const diff = i.recibido && i.montoReal ? (i.montoReal - i.monto) : 0;
+    const diffTxt = diff !== 0 ? `<span class="${diff>0?'diff-pos':'diff-neg'}">${diff>0?'+':'-'}${$m(Math.abs(diff))}</span>` : '';
+    return `<div class="item-row">
       <div class="item-left">
         <div class="item-nombre">${i.concepto}</div>
         <div class="item-sub"><span class="ingreso-tipo">${i.tipo}</span> · ${i.fecha||''} · ${i.banco||''}</div>
+        ${badge}
       </div>
       <div class="item-right">
-        <div class="item-monto" style="color:var(--green)">${$m(i.monto)}</div>
-        <button class="btn-icon-sm btn-del" onclick="delIngreso('${i.id}',${i.monto},'${i.bancoId||''}')">🗑️</button>
+        <div class="item-monto" style="color:var(--green)">${$m(i.montoReal||i.monto)} ${diffTxt}</div>
+        ${!i.recibido?`<button class="btn-accion btn-pagar" onclick="abrirIngresoModal('${i.id}','${i.concepto}',${i.monto},'${i.bancoId||''}')">✓ Recibir</button>`:''}
+        <button class="btn-icon-sm btn-del" onclick="delIngreso('${i.id}',${i.montoReal||i.monto},'${i.bancoId||''}',${i.recibido||false})">🗑️</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderGastosFijos(items){
@@ -705,21 +711,27 @@ function renderPendientes(items){
 }
 
 function renderGastosVar(items){
-  _gv = items.reduce((a,i)=>a+i.monto,0);
+  _gv = items.filter(i=>i.confirmado).reduce((a,i)=>a+(i.montoReal||i.monto),0);
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const el = document.getElementById('lista-gastos-var');
   if(!items.length){ el.innerHTML='<div class="empty">Sin gastos variables este mes</div>'; return; }
-  el.innerHTML = items.map(i=>`
-    <div class="item-row">
+  el.innerHTML = items.map(i=>{
+    const badge = i.confirmado ? `<span class="item-badge badge-ok">Confirmado</span>` : `<span class="item-badge badge-pen">Pendiente</span>`;
+    const diff = i.confirmado && i.montoReal ? (i.montoReal - i.monto) : 0;
+    const diffTxt = diff !== 0 ? `<span class="${diff>0?'diff-neg':'diff-pos'}">${diff>0?'+':'-'}${$m(Math.abs(diff))}</span>` : '';
+    return `<div class="item-row">
       <div class="item-left">
         <div class="item-nombre">${i.concepto}</div>
         <div class="item-sub">${i.fecha||''} · ${i.banco||''}</div>
+        ${badge}
       </div>
       <div class="item-right">
-        <div class="item-monto" style="color:var(--red)">${$m(i.monto)}</div>
-        <button class="btn-icon-sm btn-del" onclick="delGastoVar('${i.id}',${i.monto},'${i.bancoId||''}')">🗑️</button>
+        <div class="item-monto" style="color:var(--red)">${$m(i.montoReal||i.monto)} ${diffTxt}</div>
+        ${!i.confirmado?`<button class="btn-accion btn-pagar" onclick="abrirPago('${i.id}','gv','${i.concepto}',${i.monto})">✓ Confirmar</button>`:''}
+        <button class="btn-icon-sm btn-del" onclick="delGastoVar('${i.id}',${i.montoReal||i.monto},'${i.bancoId||''}',${i.confirmado||false})">🗑️</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderGustos(items){
@@ -844,10 +856,7 @@ expose('addIngreso', async () => {
   const fecha = document.getElementById('ing-fecha').value || hoy();
   if(!concepto || isNaN(monto) || monto<=0){ alert('Completa concepto y monto'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
-  await addDoc(collection(db,'ingresos'),{uid,concepto,monto,tipo,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual)});
-  if(bancoId && banco){
-    await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
-  }
+  await addDoc(collection(db,'ingresos'),{uid,concepto,monto,tipo,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),recibido:false,montoReal:null});
   document.getElementById('ing-concepto').value='';
   document.getElementById('ing-monto').value='';
 });
@@ -872,8 +881,7 @@ expose('addGastoVar', async () => {
   const fecha = document.getElementById('gv-fecha').value || hoy();
   if(!concepto||isNaN(monto)||monto<=0){ alert('Completa los campos'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
-  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),recurrente:true});
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
+  await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual),confirmado:false,montoReal:null,recurrente:true});
   document.getElementById('gv-concepto').value='';
   document.getElementById('gv-monto').value='';
 });
@@ -934,14 +942,47 @@ expose('abrirPago', (id, tipo, concepto, presupuesto) => {
   };
 });
 
+// RECIBIR INGRESO
+expose('abrirIngresoModal', (id, concepto, monto, bancoId) => {
+  pagoItem = {id, tipo:'ing', concepto, presupuesto:monto, bancoId};
+  document.getElementById('modal-pago-info').textContent = concepto + ' — Presupuestado: ' + $m(monto);
+  document.getElementById('modal-monto-real').value = monto.toFixed(2);
+  document.getElementById('modal-diff').textContent = '';
+  actualizarSelectsBancos();
+  document.getElementById('modal-banco-pago').value = bancoId;
+  document.getElementById('modal-pago').classList.add('open');
+  document.getElementById('modal-monto-real').oninput = function(){
+    const diff = parseFloat(this.value) - monto;
+    const el = document.getElementById('modal-diff');
+    if(Math.abs(diff)<0.01){ el.textContent='✓ Ingreso exacto'; el.style.color='var(--green)'; }
+    else if(diff>0){ el.textContent=`Recibirás $${diff.toFixed(2)} más de lo presupuestado`; el.style.color='var(--green)'; }
+    else{ el.textContent=`Recibirás $${Math.abs(diff).toFixed(2)} menos de lo presupuestado`; el.style.color='var(--orange)'; }
+  };
+});
+
 expose('confirmarPago', async () => {
   if(!pagoItem) return;
   const montoReal = parseFloat(document.getElementById('modal-monto-real').value)||0;
   const bancoId = document.getElementById('modal-banco-pago').value;
   if(montoReal<=0){ alert('Ingresa un monto válido'); return; }
-  await updateDoc(doc(db,'gastos_fijos',pagoItem.id),{pagado:true, montoReal, bancoId});
-  const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+  
+  if(pagoItem.tipo === 'ing'){
+    // Ingreso
+    await updateDoc(doc(db,'ingresos',pagoItem.id),{recibido:true, montoReal, bancoId});
+    const banco = bancosCache.find(b=>b.id===bancoId);
+    if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + montoReal});
+  } else if(pagoItem.tipo === 'gf'){
+    // Gasto Fijo
+    await updateDoc(doc(db,'gastos_fijos',pagoItem.id),{pagado:true, montoReal, bancoId});
+    const banco = bancosCache.find(b=>b.id===bancoId);
+    if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+  } else if(pagoItem.tipo === 'gv'){
+    // Gasto Variable
+    await updateDoc(doc(db,'gastos_var',pagoItem.id),{confirmado:true, montoReal, bancoId});
+    const banco = bancosCache.find(b=>b.id===bancoId);
+    if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+  }
+  
   cerrarModal('modal-pago');
   pagoItem = null;
 });
@@ -986,21 +1027,23 @@ expose('guardarPresupuestoGustos', async () => {
 });
 
 // DELETES
-expose('delIngreso', async (id, monto, bancoId) => {
+expose('delIngreso', async (id, monto, bancoId, recibido) => {
   if(!confirm('¿Eliminar este ingreso?')) return;
   await deleteDoc(doc(db,'ingresos',id));
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
+  // Solo devolver dinero al banco si ya fue recibido
+  if(recibido && bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
 });
 expose('delGastoFijo', async id => {
   if(!confirm('¿Eliminar este gasto fijo?')) return;
   await deleteDoc(doc(db,'gastos_fijos',id));
 });
-expose('delGastoVar', async (id, monto, bancoId) => {
+expose('delGastoVar', async (id, monto, bancoId, confirmado) => {
   if(!confirm('¿Eliminar este gasto?')) return;
   await deleteDoc(doc(db,'gastos_var',id));
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
+  // Solo devolver dinero al banco si ya fue confirmado (gastado)
+  if(confirmado && bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
 });
 expose('delGusto', async (id, monto, bancoId) => {
   if(!confirm('¿Eliminar este gasto?')) return;
