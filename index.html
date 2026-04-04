@@ -204,6 +204,13 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <div class="card-tt">💳 Mis Deudas</div>
       <div id="res-deudas"><div class="empty">Sin deudas registradas</div></div>
     </div>
+    <div class="card">
+      <div class="card-hd">
+        <div class="card-tt">📤 Trasladar Saldo</div>
+      </div>
+      <p style="font-size:12px;color:var(--t3);margin-bottom:12px">Registra el saldo actual del banco como ingreso del próximo mes y avanza automáticamente.</p>
+      <button class="btn-add" onclick="trasladarSaldoSiguienteMes()" style="width:100%">📤 Trasladar a Siguiente Mes</button>
+    </div>
   </div>
 
   <div class="sec" id="sec-ingresos">
@@ -434,7 +441,7 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, where, onSnapshot, updateDoc, doc, getDoc, deleteDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, query, where, onSnapshot, updateDoc, doc, getDoc, deleteDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAy0pcPg5nF1cQNlSBLG_5JJvgJij0aswM",
@@ -638,6 +645,49 @@ async function crearIngresoSobrante(){
     });
   }
 }
+
+expose('trasladarSaldoSiguienteMes', async () => {
+  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
+  
+  if(totalBancos <= 0){
+    alert('No hay saldo para trasladar');
+    return;
+  }
+  
+  if(!confirm(`¿Trasladar $${totalBancos.toFixed(2)} al siguiente mes como ingreso?`)) return;
+  
+  // Calcular el mes siguiente
+  const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
+  const mesPróximoKey = mesKey(mesProximo);
+  
+  // Crear ingreso de sobrante en el mes siguiente
+  await addDoc(collection(db,'ingresos'),{
+    uid,
+    concepto: 'Sobrante Mes Anterior',
+    monto: totalBancos,
+    montoReal: totalBancos,
+    tipo: 'sobrante',
+    bancoId: '',
+    banco: 'Saldo Inicial',
+    fecha: hoy(),
+    mesKey: mesPróximoKey,
+    recibido: true  // Ya está recibido
+  });
+  
+  // Limpiar saldo de todos los bancos
+  for(const banco of bancosCache){
+    await updateDoc(doc(db,'bancos',banco.id),{saldo: 0});
+  }
+  
+  // Cambiar al siguiente mes
+  mesActual = mesProximo;
+  actualizarMesTitulo();
+  await copiarGastosFijosRecurrentes();
+  await copiarGastosVarRecurrentes();
+  renderMes();
+  
+  alert('✅ Saldo trasladado y mes avanzado');
+});
 
 async function copiarGastosVarRecurrentes(){
   const mesActualKey = mesKey(mesActual);
