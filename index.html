@@ -529,11 +529,11 @@ function actualizarMesTitulo(){
   document.getElementById('mes-titulo').textContent = mesNombre(mesActual);
 }
 
-expose('cambiarMes', dir => {
+expose('cambiarMes', async dir => {
   mesActual = new Date(mesActual.getFullYear(), mesActual.getMonth() + dir, 1);
   actualizarMesTitulo();
-  copiarGastosFijosRecurrentes();
-  copiarGastosVarRecurrentes();
+  await copiarGastosFijosRecurrentes();
+  await copiarGastosVarRecurrentes();
   renderMes();
 });
 
@@ -697,6 +697,8 @@ expose('trasladarSaldoSiguienteMes', async () => {
   // Cambiar al siguiente mes
   mesActual = mesProximo;
   actualizarMesTitulo();
+  await copiarGastosFijosRecurrentes();
+  await copiarGastosVarRecurrentes();
   renderMes();
   
   alert('✅ Saldo trasladado y mes avanzado');
