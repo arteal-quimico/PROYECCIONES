@@ -782,8 +782,6 @@ expose('trasladarSaldoSiguienteMes', async () => {
     alert('Ya existe un sobrante registrado para el siguiente mes.');
     mesActual = mesProximo;
     actualizarMesTitulo();
-    await copiarGastosFijosRecurrentes();
-    await copiarGastosVarRecurrentes();
     renderMes();
     return;
   }
@@ -1431,6 +1429,8 @@ function actualizarSelectDeudas(){
 }
 
 expose('proyectarDesdeMesAnterior', proyectarDesdeMesAnterior);
+
+expose('cerrarModal', id => {
   document.getElementById(id).classList.remove('open');
 });
 
