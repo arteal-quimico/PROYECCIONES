@@ -216,6 +216,9 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <div style="margin-bottom:12px">
         <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">PRESUPUESTADO:</div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Saldo inicial (bancos):</span><span style="color:var(--blue)" id="pres-saldo-ini">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
           <span>Ingresos:</span><span style="color:var(--green)" id="pres-ing">$0.00</span>
         </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
@@ -230,6 +233,9 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       </div>
       <div style="margin-bottom:12px">
         <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">REAL (CONFIRMADO):</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Saldo inicial (bancos):</span><span style="color:var(--blue)" id="real-saldo-ini">$0.00</span>
+        </div>
         <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
           <span>Ingresos:</span><span style="color:var(--green)" id="real-ing">$0.00</span>
         </div>
@@ -820,18 +826,24 @@ function calcRestante(){
 }
 
 function calcAnalisDual(){
+  const saldoInicial = bancosCache.reduce((a,b)=>a+b.saldo,0);
+
   // PRESUPUESTADO (todo lo que existe, confirmado o no)
-  const presIngresos = (_ing_total||0); // todos los ingresos
-  const presGastos = (_gf_total||0) + (_gv_total||0) + (_gu_total||0); // todos los gastos
-  const presDeu = (_deu_pagar||0); // deudas a pagar presupuestadas
-  const presRestante = presIngresos - presGastos - presDeu;
+  const presIngresos = (_ing_total||0);
+  const presGastos = (_gf_total||0) + (_gv_total||0) + (_gu_total||0);
+  const presDeu = (_deu_pagar||0);
+  const presRestante = saldoInicial + presIngresos - presGastos - presDeu;
   
   // REAL (solo confirmados)
-  const realIngresos = _ing; // solo recibidos
-  const realGastos = _gf + _gv + _gu; // solo confirmados
-  const realDeu = (_deu_abonada||0); // solo abonadas
-  const realRestante = realIngresos - realGastos - realDeu;
+  const realIngresos = _ing;
+  const realGastos = _gf + _gv + _gu;
+  const realDeu = (_deu_abonada||0);
+  const realRestante = saldoInicial + realIngresos - realGastos - realDeu;
   
+  // Mostrar saldo inicial
+  document.getElementById('pres-saldo-ini').textContent = $m(saldoInicial);
+  document.getElementById('real-saldo-ini').textContent = $m(saldoInicial);
+
   // Mostrar valores
   document.getElementById('pres-ing').textContent = $m(presIngresos);
   document.getElementById('pres-gas').textContent = $m(presGastos);
