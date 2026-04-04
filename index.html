@@ -856,7 +856,16 @@ expose('addBanco', async () => {
   const saldo = parseFloat(document.getElementById('b-saldo').value)||0;
   const tipo = document.getElementById('b-tipo').value;
   if(!nombre){ alert('Ingresa el nombre del banco'); return; }
-  await addDoc(collection(db,'bancos'),{uid,nombre,saldo,tipo});
+  
+  // Ajustamos el nombre del campo a 'saldo' para que sea compatible con tu base actual
+  await addDoc(collection(db,'bancos'),{
+    uid,
+    nombre,
+    saldo: saldo, // Aquí estaba el detalle
+    tipo,
+    fechaCreacion: new Date()
+  });
+  
   document.getElementById('b-nombre').value='';
   document.getElementById('b-saldo').value='';
 });
