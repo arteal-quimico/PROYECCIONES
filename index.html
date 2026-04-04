@@ -372,29 +372,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <div id="lista-deudas"><div class="empty">Sin deudas registradas</div></div>
     </div>
   </div>
-
-  <div class="sec" id="sec-ia">
-    <div class="card">
-      <div class="card-tt">🤖 Asesor Financiero IA</div>
-      <p style="font-size:12px;color:var(--t3);margin-bottom:12px">Análisis basado en tu flujo de caja real. Metodología: Presupuesto Base Cero adaptado a Latinoamérica.</p>
-      <button class="btn-ia" onclick="pedirConsejo('general')">📊 Análisis General del Mes</button>
-      <button class="btn-ia" onclick="pedirConsejo('deudas')" style="margin-top:6px">💳 Estrategia para mis Deudas</button>
-      <button class="btn-ia" onclick="pedirConsejo('ahorro')" style="margin-top:6px">💰 ¿Cuánto puedo ahorrar?</button>
-      <button class="btn-ia" onclick="pedirConsejo('emergencia')" style="margin-top:6px">🛡️ Fondo de Emergencia</button>
-    </div>
-    <div id="ia-respuesta"></div>
-  </div>
-
-  <nav class="nav-bar">
-    <div class="nav-btn active" id="nav-resumen" onclick="showSec('resumen',this)"><span>🏠</span>Inicio</div>
-    <div class="nav-btn" id="nav-ingresos" onclick="showSec('ingresos',this)"><span>💵</span>Ingresos</div>
-    <div class="nav-btn" id="nav-gastos" onclick="showSec('gastos',this)"><span>📋</span>Gastos</div>
-    <div class="nav-btn" id="nav-bancos" onclick="showSec('bancos',this)"><span>🏦</span>Bancos</div>
-    <div class="nav-btn" id="nav-deudas" onclick="showSec('deudas',this)"><span>💳</span>Deudas</div>
-    <div class="nav-btn" id="nav-ia" onclick="showSec('ia',this)"><span>🤖</span>IA</div>
-  </nav>
-</div>
-
 <!-- MODAL PAGO -->
 <div class="modal-overlay" id="modal-pago">
   <div class="modal">
@@ -998,58 +975,6 @@ expose('cerrarModal', id => {
 document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); });
 });
-
-// IA ASESOR
-expose('pedirConsejo', async tipo => {
-  const el = document.getElementById('ia-respuesta');
-  el.innerHTML = '<div class="ia-burbuja"><div class="ia-cargando">Analizando tu situación financiera...</div></div>';
-  
-  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
-  const totalDeudas = deudasCache.reduce((a,d)=>a+d.saldoActual,0);
-  const deudaMin = deudasCache.reduce((a,d)=>a+d.cuota,0);
-  const restante = _ing - _gf - _gv - _gu;
-
-  const contexto = `Eres un asesor financiero personal para Ecuador/Latinoamérica. Usa metodología Presupuesto Base Cero. 
-Sé directo, práctico y conciso (máximo 4 líneas). NO recomiendes inversiones específicas, criptos ni productos financieros concretos.
-Solo habla de lo que el usuario puede hacer con su dinero actual.
-
-Datos del usuario este mes:
-- Ingresos: $${_ing.toFixed(2)}
-- Gastos fijos pagados: $${_gf.toFixed(2)}
-- Gastos variables: $${_gv.toFixed(2)}
-- Gustos: $${_gu.toFixed(2)} (límite: $${gustosLimite})
-- Restante del mes: $${restante.toFixed(2)}
-- Total en bancos: $${totalBancos.toFixed(2)}
-- Total deudas: $${totalDeudas.toFixed(2)}
-- Cuotas mínimas de deudas: $${deudaMin.toFixed(2)}
-- Deudas: ${deudasCache.map(d=>d.nombre+': $'+d.saldoActual.toFixed(2)).join(', ')||'Ninguna'}`;
-
-  const preguntas = {
-    general: 'Dame un análisis rápido de mi mes y 2 acciones concretas que debo tomar.',
-    deudas: 'Analiza mis deudas y dime cuál atacar primero y cuánto abonar extra este mes para salir más rápido.',
-    ahorro: 'Con mi restante, ¿cuánto puedo ahorrar de forma realista este mes sin descuidar deudas?',
-    emergencia: 'Mis gastos fijos son $'+_gf.toFixed(2)+'. ¿Cuánto necesito en fondo de emergencia y en cuánto tiempo puedo lograrlo con mi restante actual?'
-  };
-
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: contexto,
-        messages: [{role:'user', content: preguntas[tipo]}]
-      })
-    });
-    const data = await res.json();
-    const texto = data.content?.[0]?.text || 'No pude generar un análisis en este momento.';
-    el.innerHTML = `<div class="ia-burbuja"><div class="ia-texto">${texto.replace(/\n/g,'<br>')}</div></div>`;
-  } catch(e){
-    el.innerHTML = `<div class="ia-burbuja"><div class="ia-texto" style="color:var(--red)">Error al conectar con el asesor. Verifica tu conexión.</div></div>`;
-  }
-});
-
 </script>
 
 <script>
