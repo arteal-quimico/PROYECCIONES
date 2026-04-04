@@ -438,6 +438,21 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </div>
 </div>
 
+<!-- MODAL EDITAR BANCO -->
+<div class="modal-overlay" id="modal-editar-banco">
+  <div class="modal">
+    <h3>Editar Banco</h3>
+    <label>Nombre del banco</label>
+    <input type="text" class="fi-sm" id="modal-banco-nombre">
+    <label>Saldo ($)</label>
+    <input type="number" class="fi-sm" id="modal-banco-saldo" step="0.01">
+    <div class="modal-btns">
+      <button class="btn-confirm" onclick="guardarEditoBanco()">Guardar</button>
+      <button class="btn-cancel" onclick="cerrarModal('modal-editar-banco')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
@@ -849,6 +864,7 @@ function renderBancos(){
       </div>
       <div style="text-align:right">
         <div class="banco-saldo">${$m(b.saldo)}</div>
+        <button class="btn-icon-sm" onclick="abrirEditoBanco('${b.id}','${b.nombre}',${b.saldo})" style="margin-right:4px">✏️</button>
         <button class="btn-icon-sm btn-del" onclick="delBanco('${b.id}')">🗑️</button>
       </div>
     </div>`).join('');
@@ -1131,6 +1147,25 @@ expose('delGusto', async (id, monto, bancoId) => {
 expose('delBanco', async id => {
   if(!confirm('¿Eliminar este banco?')) return;
   await deleteDoc(doc(db,'bancos',id));
+});
+
+let bancoEditando = null;
+
+expose('abrirEditoBanco', (id, nombre, saldo) => {
+  bancoEditando = {id};
+  document.getElementById('modal-banco-nombre').value = nombre;
+  document.getElementById('modal-banco-saldo').value = saldo.toFixed(2);
+  document.getElementById('modal-editar-banco').classList.add('open');
+});
+
+expose('guardarEditoBanco', async () => {
+  if(!bancoEditando) return;
+  const nombre = document.getElementById('modal-banco-nombre').value.trim();
+  const saldo = parseFloat(document.getElementById('modal-banco-saldo').value)||0;
+  if(!nombre){ alert('Ingresa el nombre del banco'); return; }
+  await updateDoc(doc(db,'bancos',bancoEditando.id),{nombre, saldo});
+  cerrarModal('modal-editar-banco');
+  bancoEditando = null;
 });
 expose('delDeuda', async id => {
   if(!confirm('¿Eliminar esta deuda?')) return;
