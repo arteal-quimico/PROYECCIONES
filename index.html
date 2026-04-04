@@ -156,7 +156,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
 </head>
 <body>
 
-<!-- LOGIN -->
 <div class="login-wrap" id="login-wrap">
   <div class="login-box">
     <div class="login-logo">💰 Planificador</div>
@@ -170,7 +169,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </div>
 </div>
 
-<!-- APP -->
 <div class="app" id="app">
   <div class="topbar">
     <div class="user-greeting">
@@ -180,7 +178,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
     <button class="btn-sm" onclick="doLogout()">Salir</button>
   </div>
 
-  <!-- MES HEADER -->
   <div class="mes-header">
     <div class="mes-nav">
       <button onclick="cambiarMes(-1)">‹</button>
@@ -194,7 +191,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
     </div>
   </div>
 
-  <!-- SECCIONES -->
   <div class="sec on" id="sec-resumen">
     <div class="card">
       <div class="card-tt">📋 Pagos Pendientes del Mes</div>
@@ -242,7 +238,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <button class="stab" id="stab-variables" onclick="showStab('variables',this)">Variables</button>
       <button class="stab" id="stab-gustos" onclick="showStab('gustos',this)">Gustos</button>
     </div>
-    <!-- GASTOS FIJOS -->
     <div id="sub-fijos">
       <div class="card">
         <div class="card-tt">Agregar Gasto Fijo</div>
@@ -274,7 +269,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
         <div id="lista-gastos-fijos"><div class="empty">Sin gastos fijos</div></div>
       </div>
     </div>
-    <!-- GASTOS VARIABLES -->
     <div id="sub-variables" style="display:none">
       <div class="card">
         <div class="card-tt">Registrar Gasto Variable</div>
@@ -293,7 +287,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
         <div id="lista-gastos-var"><div class="empty">Sin gastos variables</div></div>
       </div>
     </div>
-    <!-- GUSTOS -->
     <div id="sub-gustos" style="display:none">
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -395,7 +388,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </nav>
 </div>
 
-<!-- MODAL PAGO -->
 <div class="modal-overlay" id="modal-pago">
   <div class="modal">
     <h3>Registrar Pago</h3>
@@ -412,7 +404,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </div>
 </div>
 
-<!-- MODAL GUSTOS EDITAR -->
 <div class="modal-overlay" id="modal-gustos">
   <div class="modal">
     <h3>Presupuesto para Gustos</h3>
@@ -426,7 +417,6 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </div>
 </div>
 
-<!-- MODAL ABONO DEUDA -->
 <div class="modal-overlay" id="modal-abono">
   <div class="modal">
     <h3>Abonar a Deuda</h3>
@@ -544,7 +534,11 @@ function cargarConfig(){
 
 function cargarBancos(){
   const u = onSnapshot(query(collection(db,'bancos'),where('uid','==',uid)), snap => {
-    bancosCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+    bancosCache = snap.docs.map(d=>{
+      const data = d.data();
+      // Unificación técnica para que lea 'saldo' o 'saldoActual'
+      return {id:d.id, ...data, saldo: data.saldoActual || data.saldo || 0};
+    });
     renderBancos();
     actualizarSelectsBancos();
   });
@@ -562,7 +556,6 @@ function cargarDeudas(){
 
 function renderMes(){
   const mk = mesKey(mesActual);
-  // Ingresos
   onSnapshot(query(collection(db,'ingresos'),where('uid','==',uid),where('mesKey','==',mk)), snap => {
     const items = snap.docs.map(d=>({id:d.id,...d.data()}));
     renderIngresos(items);
@@ -570,20 +563,17 @@ function renderMes(){
     document.getElementById('kpi-ing').textContent = $m(totalIng);
     calcRestante();
   });
-  // Gastos fijos
   onSnapshot(query(collection(db,'gastos_fijos'),where('uid','==',uid),where('mesKey','==',mk)), snap => {
     const items = snap.docs.map(d=>({id:d.id,...d.data()}));
     renderGastosFijos(items);
     renderPendientes(items);
     calcRestante();
   });
-  // Gastos variables
   onSnapshot(query(collection(db,'gastos_var'),where('uid','==',uid),where('mesKey','==',mk)), snap => {
     const items = snap.docs.map(d=>({id:d.id,...d.data()}));
     renderGastosVar(items);
     calcRestante();
   });
-  // Gustos
   onSnapshot(query(collection(db,'gustos'),where('uid','==',uid),where('mesKey','==',mk)), snap => {
     const items = snap.docs.map(d=>({id:d.id,...d.data()}));
     renderGustos(items);
@@ -602,7 +592,7 @@ function renderIngresos(items){
   _ing = items.reduce((a,i)=>a+i.monto,0);
   document.getElementById('kpi-ing').textContent = $m(_ing);
   const el = document.getElementById('lista-ingresos');
-  if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos este mes</div>'; return; }
+  if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos registrados</div>'; return; }
   el.innerHTML = items.map(i=>`
     <div class="item-row">
       <div class="item-left">
@@ -620,7 +610,7 @@ function renderGastosFijos(items){
   _gf = items.filter(i=>i.pagado).reduce((a,i)=>a+(i.montoReal||i.presupuesto),0);
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const el = document.getElementById('lista-gastos-fijos');
-  if(!items.length){ el.innerHTML='<div class="empty">Sin gastos fijos este mes</div>'; return; }
+  if(!items.length){ el.innerHTML='<div class="empty">Sin gastos fijos</div>'; return; }
   el.innerHTML = items.map(i=>{
     const badge = i.pagado ? `<span class="item-badge badge-ok">Pagado</span>` : (estaVencido(i) ? `<span class="item-badge badge-ven">Vencido</span>` : `<span class="item-badge badge-pen">Pendiente</span>`);
     const diff = i.pagado && i.montoReal ? (i.montoReal - i.presupuesto) : 0;
@@ -665,7 +655,7 @@ function renderGastosVar(items){
   _gv = items.reduce((a,i)=>a+i.monto,0);
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const el = document.getElementById('lista-gastos-var');
-  if(!items.length){ el.innerHTML='<div class="empty">Sin gastos variables este mes</div>'; return; }
+  if(!items.length){ el.innerHTML='<div class="empty">Sin gastos variables</div>'; return; }
   el.innerHTML = items.map(i=>`
     <div class="item-row">
       <div class="item-left">
@@ -803,7 +793,7 @@ expose('addIngreso', async () => {
   const banco = bancosCache.find(b=>b.id===bancoId);
   await addDoc(collection(db,'ingresos'),{uid,concepto,monto,tipo,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual)});
   if(bancoId && banco){
-    await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
+    await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) + monto});
   }
   document.getElementById('ing-concepto').value='';
   document.getElementById('ing-monto').value='';
@@ -830,7 +820,7 @@ expose('addGastoVar', async () => {
   if(!concepto||isNaN(monto)||monto<=0){ alert('Completa los campos'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
   await addDoc(collection(db,'gastos_var'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual)});
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) - monto});
   document.getElementById('gv-concepto').value='';
   document.getElementById('gv-monto').value='';
 });
@@ -843,10 +833,10 @@ expose('addGusto', async () => {
   if(!concepto||isNaN(monto)||monto<=0){ alert('Completa los campos'); return; }
   const banco = bancosCache.find(b=>b.id===bancoId);
   if(_gu + monto > gustosLimite * 1.5){
-    if(!confirm(`⚠️ Te estás excediendo bastante del presupuesto de gustos ($${gustosLimite}). ¿Continuar?`)) return;
+    if(!confirm(`⚠️ Te estás excediendo bastante. ¿Continuar?`)) return;
   }
   await addDoc(collection(db,'gustos'),{uid,concepto,monto,bancoId,banco:banco?banco.nombre:'',fecha,mesKey:mesKey(mesActual)});
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) - monto});
   document.getElementById('gu-concepto').value='';
   document.getElementById('gu-monto').value='';
 });
@@ -856,7 +846,8 @@ expose('addBanco', async () => {
   const saldo = parseFloat(document.getElementById('b-saldo').value)||0;
   const tipo = document.getElementById('b-tipo').value;
   if(!nombre){ alert('Ingresa el nombre del banco'); return; }
-  await addDoc(collection(db,'bancos'),{uid,nombre,saldo,tipo});
+  // Sincronización de guardado para que lea ambos nombres
+  await addDoc(collection(db,'bancos'),{uid,nombre,saldo:saldo,saldoActual:saldo,tipo});
   document.getElementById('b-nombre').value='';
   document.getElementById('b-saldo').value='';
 });
@@ -886,8 +877,8 @@ expose('abrirPago', (id, tipo, concepto, presupuesto) => {
     const diff = parseFloat(this.value) - presupuesto;
     const el = document.getElementById('modal-diff');
     if(Math.abs(diff)<0.01){ el.textContent='✓ Pago exacto'; el.style.color='var(--green)'; }
-    else if(diff>0){ el.textContent=`Pagas $${diff.toFixed(2)} más de lo presupuestado`; el.style.color='var(--orange)'; }
-    else{ el.textContent=`Pagas $${Math.abs(diff).toFixed(2)} menos de lo presupuestado`; el.style.color='var(--blue)'; }
+    else if(diff>0){ el.textContent=`Pagas $${diff.toFixed(2)} más`; el.style.color='var(--orange)'; }
+    else{ el.textContent=`Pagas $${Math.abs(diff).toFixed(2)} menos`; el.style.color='var(--blue)'; }
   };
 });
 
@@ -895,10 +886,10 @@ expose('confirmarPago', async () => {
   if(!pagoItem) return;
   const montoReal = parseFloat(document.getElementById('modal-monto-real').value)||0;
   const bancoId = document.getElementById('modal-banco-pago').value;
-  if(montoReal<=0){ alert('Ingresa un monto válido'); return; }
+  if(montoReal<=0){ alert('Monto inválido'); return; }
   await updateDoc(doc(db,'gastos_fijos',pagoItem.id),{pagado:true, montoReal, bancoId});
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) - montoReal});
   cerrarModal('modal-pago');
   pagoItem = null;
 });
@@ -906,7 +897,7 @@ expose('confirmarPago', async () => {
 // ABONO DEUDA
 expose('abrirAbono', (id, nombre, saldo, cuota) => {
   abonoDeuda = {id, nombre, saldo, cuota};
-  document.getElementById('modal-abono-info').textContent = nombre + ' — Saldo: ' + $m(saldo) + ' — Cuota sugerida: ' + $m(cuota);
+  document.getElementById('modal-abono-info').textContent = nombre + ' — Saldo: ' + $m(saldo);
   document.getElementById('modal-abono-val').value = cuota.toFixed(2);
   actualizarSelectsBancos();
   document.getElementById('modal-abono').classList.add('open');
@@ -916,16 +907,14 @@ expose('confirmarAbono', async () => {
   if(!abonoDeuda) return;
   const monto = parseFloat(document.getElementById('modal-abono-val').value)||0;
   const bancoId = document.getElementById('modal-abono-banco').value;
-  if(monto<=0){ alert('Ingresa un monto válido'); return; }
+  if(monto<=0){ alert('Monto inválido'); return; }
   const nuevoSaldo = Math.max(0, abonoDeuda.saldo - monto);
   await updateDoc(doc(db,'deudas',abonoDeuda.id),{saldoActual: nuevoSaldo});
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
-  // Registrar como gasto variable del mes
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) - monto});
   await addDoc(collection(db,'gastos_var'),{uid,concepto:'Abono: '+abonoDeuda.nombre,monto,bancoId,banco:banco?banco.nombre:'',fecha:hoy(),mesKey:mesKey(mesActual),esAbono:true});
   cerrarModal('modal-abono');
   abonoDeuda = null;
-  if(nuevoSaldo===0) alert('🎉 ¡Deuda liquidada! Excelente trabajo.');
 });
 
 // EDITAR GUSTOS
@@ -944,33 +933,33 @@ expose('guardarPresupuestoGustos', async () => {
 
 // DELETES
 expose('delIngreso', async (id, monto, bancoId) => {
-  if(!confirm('¿Eliminar este ingreso?')) return;
+  if(!confirm('¿Eliminar?')) return;
   await deleteDoc(doc(db,'ingresos',id));
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - monto});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) - monto});
 });
 expose('delGastoFijo', async id => {
-  if(!confirm('¿Eliminar este gasto fijo?')) return;
+  if(!confirm('¿Eliminar?')) return;
   await deleteDoc(doc(db,'gastos_fijos',id));
 });
 expose('delGastoVar', async (id, monto, bancoId) => {
-  if(!confirm('¿Eliminar este gasto?')) return;
+  if(!confirm('¿Eliminar?')) return;
   await deleteDoc(doc(db,'gastos_var',id));
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) + monto});
 });
 expose('delGusto', async (id, monto, bancoId) => {
-  if(!confirm('¿Eliminar este gasto?')) return;
+  if(!confirm('¿Eliminar?')) return;
   await deleteDoc(doc(db,'gustos',id));
   const banco = bancosCache.find(b=>b.id===bancoId);
-  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo + monto});
+  if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldoActual: (banco.saldoActual || banco.saldo) + monto});
 });
 expose('delBanco', async id => {
-  if(!confirm('¿Eliminar este banco?')) return;
+  if(!confirm('¿Eliminar banco?')) return;
   await deleteDoc(doc(db,'bancos',id));
 });
 expose('delDeuda', async id => {
-  if(!confirm('¿Eliminar esta deuda?')) return;
+  if(!confirm('¿Eliminar deuda?')) return;
   await deleteDoc(doc(db,'deudas',id));
 });
 
@@ -987,75 +976,50 @@ expose('showStab', (id, btn) => {
     document.getElementById('sub-'+t).style.display = t===id?'block':'none';
   });
   document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
-  btn.classList.add('on');
+  btn.classList.on;
 });
 
 expose('cerrarModal', id => {
   document.getElementById(id).classList.remove('open');
 });
 
-// CERRAR MODALES AL HACER CLIC AFUERA
 document.querySelectorAll('.modal-overlay').forEach(m=>{
   m.addEventListener('click', e=>{ if(e.target===m) m.classList.remove('open'); });
 });
 
-// IA ASESOR
 expose('pedirConsejo', async tipo => {
   const el = document.getElementById('ia-respuesta');
-  el.innerHTML = '<div class="ia-burbuja"><div class="ia-cargando">Analizando tu situación financiera...</div></div>';
-  
+  el.innerHTML = '<div class="ia-burbuja"><div class="ia-cargando">Analizando...</div></div>';
   const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
   const totalDeudas = deudasCache.reduce((a,d)=>a+d.saldoActual,0);
-  const deudaMin = deudasCache.reduce((a,d)=>a+d.cuota,0);
   const restante = _ing - _gf - _gv - _gu;
-
-  const contexto = `Eres un asesor financiero personal para Ecuador/Latinoamérica. Usa metodología Presupuesto Base Cero. 
-Sé directo, práctico y conciso (máximo 4 líneas). NO recomiendes inversiones específicas, criptos ni productos financieros concretos.
-Solo habla de lo que el usuario puede hacer con su dinero actual.
-
-Datos del usuario este mes:
-- Ingresos: $${_ing.toFixed(2)}
-- Gastos fijos pagados: $${_gf.toFixed(2)}
-- Gastos variables: $${_gv.toFixed(2)}
-- Gustos: $${_gu.toFixed(2)} (límite: $${gustosLimite})
-- Restante del mes: $${restante.toFixed(2)}
-- Total en bancos: $${totalBancos.toFixed(2)}
-- Total deudas: $${totalDeudas.toFixed(2)}
-- Cuotas mínimas de deudas: $${deudaMin.toFixed(2)}
-- Deudas: ${deudasCache.map(d=>d.nombre+': $'+d.saldoActual.toFixed(2)).join(', ')||'Ninguna'}`;
-
+  const contexto = `Eres asesor financiero. Directo y conciso. Datos: Ingresos $${_ing}, Gastos $${_gf+$_gv+$_gu}, Bancos $${totalBancos}, Deudas $${totalDeudas}.`;
   const preguntas = {
-    general: 'Dame un análisis rápido de mi mes y 2 acciones concretas que debo tomar.',
-    deudas: 'Analiza mis deudas y dime cuál atacar primero y cuánto abonar extra este mes para salir más rápido.',
-    ahorro: 'Con mi restante, ¿cuánto puedo ahorrar de forma realista este mes sin descuidar deudas?',
-    emergencia: 'Mis gastos fijos son $'+_gf.toFixed(2)+'. ¿Cuánto necesito en fondo de emergencia y en cuánto tiempo puedo lograrlo con mi restante actual?'
+    general: 'Análisis rápido de mi mes.',
+    deudas: 'Estrategia de deuda.',
+    ahorro: 'Capacidad de ahorro.',
+    emergencia: 'Fondo de emergencia.'
   };
-
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 500,
         system: contexto,
         messages: [{role:'user', content: preguntas[tipo]}]
       })
     });
     const data = await res.json();
-    const texto = data.content?.[0]?.text || 'No pude generar un análisis en este momento.';
-    el.innerHTML = `<div class="ia-burbuja"><div class="ia-texto">${texto.replace(/\n/g,'<br>')}</div></div>`;
+    el.innerHTML = `<div class="ia-burbuja"><div class="ia-texto">${data.content[0].text}</div></div>`;
   } catch(e){
-    el.innerHTML = `<div class="ia-burbuja"><div class="ia-texto" style="color:var(--red)">Error al conectar con el asesor. Verifica tu conexión.</div></div>`;
+    el.innerHTML = `<div class="ia-burbuja">Error al conectar con IA.</div>`;
   }
 });
-
 </script>
-
 <script>
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body>
 </html>
