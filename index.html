@@ -398,21 +398,49 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
   </div>
 
   <div class="sec" id="sec-deudas">
-    <div class="card">
-      <div class="card-tt">Agregar Deuda</div>
-      <div class="form-row">
-        <div class="form-gr"><label>Nombre de la deuda</label><input class="fi-sm" id="d-nombre" placeholder="Ej: Tarjeta de Crédito"></div>
-        <div class="form-gr" style="max-width:110px"><label>Saldo total ($)</label><input class="fi-sm" type="number" id="d-total" step="0.01"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-gr"><label>Cuota mensual ($)</label><input class="fi-sm" type="number" id="d-cuota" step="0.01" placeholder="Mínimo mensual"></div>
-        <div class="form-gr"><label>Día de pago</label><input class="fi-sm" type="number" id="d-dia" min="1" max="31" placeholder="16"></div>
-      </div>
-      <button class="btn-add" onclick="addDeuda()" style="width:100%">+ Registrar Deuda</button>
+    <div class="total-bancos" style="background:linear-gradient(135deg,#2e0a0a,#1a0505);border-color:var(--red)">
+      <div><div class="total-label">Total Deudas</div><div class="total-valor" id="total-deudas" style="color:var(--red)">$0.00</div></div>
+      <div style="font-size:24px">💳</div>
     </div>
-    <div class="card">
-      <div class="card-tt">Mis Deudas</div>
-      <div id="lista-deudas"><div class="empty">Sin deudas registradas</div></div>
+    <div class="subtabs" style="margin-bottom:12px">
+      <button class="stab on" id="stab-deudas-lista" onclick="showTabDeudas('lista',this)">Deudas</button>
+      <button class="stab" id="stab-deudas-pagos" onclick="showTabDeudas('pagos',this)">Pagos</button>
+    </div>
+    <div id="tab-deudas-lista">
+      <div class="card">
+        <div class="card-tt">Agregar Deuda</div>
+        <div class="form-row">
+          <div class="form-gr"><label>Nombre de la deuda</label><input class="fi-sm" id="d-nombre" placeholder="Ej: Tarjeta de Crédito"></div>
+          <div class="form-gr" style="max-width:110px"><label>Saldo total ($)</label><input class="fi-sm" type="number" id="d-total" step="0.01"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-gr"><label>Cuota mensual ($)</label><input class="fi-sm" type="number" id="d-cuota" step="0.01" placeholder="Mínimo mensual"></div>
+          <div class="form-gr"><label>Día de pago</label><input class="fi-sm" type="number" id="d-dia" min="1" max="31" placeholder="16"></div>
+        </div>
+        <button class="btn-add" onclick="addDeuda()" style="width:100%">+ Registrar Deuda</button>
+      </div>
+      <div class="card">
+        <div class="card-tt">Mis Deudas</div>
+        <div id="lista-deudas"><div class="empty">Sin deudas registradas</div></div>
+      </div>
+    </div>
+    <div id="tab-deudas-pagos" style="display:none">
+      <div class="card">
+        <div class="card-tt">Presupuestar Pago de Deuda</div>
+        <div class="form-row">
+          <div class="form-gr"><label>Seleccionar deuda</label>
+            <select class="fi-sm" id="pago-deuda-id">
+              <option value="">-- Seleccionar --</option>
+            </select>
+          </div>
+          <div class="form-gr" style="max-width:110px"><label>Monto a pagar ($)</label><input class="fi-sm" type="number" id="pago-deuda-monto" step="0.01"></div>
+        </div>
+        <button class="btn-add" onclick="addPagoDeuda()" style="width:100%">+ Presupuestar Pago</button>
+      </div>
+      <div class="card">
+        <div class="card-tt">Pagos Presupuestados Este Mes</div>
+        <div id="lista-pagos-deudas"><div class="empty">Sin pagos presupuestados</div></div>
+      </div>
     </div>
   </div>
 
@@ -579,6 +607,7 @@ function cargarTodo(){
   cargarBancos();
   cargarDeudas();
   cargarConfig();
+  cargarPagosDeudas();
   renderMes();
 }
 
@@ -951,6 +980,11 @@ function renderBancos(){
 }
 
 function renderDeudas(){
+  // Mostrar total de deudas
+  const totalDeudas = deudasCache.reduce((a,d)=>a+d.saldoActual,0);
+  _deu_pagar = deudasCache.reduce((a,d)=>a+d.cuota,0); // Para análisis dual
+  document.getElementById('total-deudas').textContent = $m(totalDeudas);
+  
   const el = document.getElementById('lista-deudas');
   if(!deudasCache.length){ el.innerHTML='<div class="empty">Sin deudas registradas</div>'; return; }
   el.innerHTML = deudasCache.map(d=>{
@@ -1098,6 +1132,81 @@ expose('addDeuda', async () => {
   document.getElementById('d-dia').value='';
 });
 
+let pagoDeuItem = null;
+
+expose('addPagoDeuda', async () => {
+  const deudaId = document.getElementById('pago-deuda-id').value;
+  const monto = parseFloat(document.getElementById('pago-deuda-monto').value);
+  if(!deudaId||isNaN(monto)||monto<=0){ alert('Selecciona deuda y monto'); return; }
+  const deuda = deudasCache.find(d=>d.id===deudaId);
+  if(!deuda) return;
+  
+  await addDoc(collection(db,'pagos_deudas'),{
+    uid,
+    deudaId,
+    deudaNombre: deuda.nombre,
+    monto,
+    montoReal: null,
+    confirmado: false,
+    fecha: hoy(),
+    mesKey: mesKey(mesActual)
+  });
+  
+  document.getElementById('pago-deuda-id').value='';
+  document.getElementById('pago-deuda-monto').value='';
+  cargarPagosDeudas();
+});
+
+function cargarPagosDeudas(){
+  const mk = mesKey(mesActual);
+  onSnapshot(query(collection(db,'pagos_deudas'),where('uid','==',uid),where('mesKey','==',mk)), snap => {
+    const items = snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderPagosDeudas(items);
+  });
+}
+
+function renderPagosDeudas(items){
+  const el = document.getElementById('lista-pagos-deudas');
+  if(!items.length){ el.innerHTML='<div class="empty">Sin pagos presupuestados</div>'; return; }
+  el.innerHTML = items.map(i=>{
+    const badge = i.confirmado ? `<span class="item-badge badge-ok">Confirmado</span>` : `<span class="item-badge badge-pen">Pendiente</span>`;
+    return `<div class="item-row">
+      <div class="item-left">
+        <div class="item-nombre">${i.deudaNombre}</div>
+        <div class="item-sub">${i.fecha||''}</div>
+        ${badge}
+      </div>
+      <div class="item-right">
+        <div class="item-monto" style="color:var(--red)">${$m(i.montoReal||i.monto)}</div>
+        ${!i.confirmado?`<button class="btn-accion btn-pagar" onclick="abrirConfirmPagodeuda('${i.id}','${i.deudaId}','${i.deudaNombre}',${i.monto})">✓ Confirmar</button>`:''}
+        <button class="btn-icon-sm btn-del" onclick="delPagoDeuda('${i.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+expose('abrirConfirmPagodeuda', (id, deudaId, deudaNombre, monto) => {
+  pagoDeuItem = {id, deudaId, deudaNombre, monto};
+  document.getElementById('modal-pago-info').textContent = deudaNombre + ' — Presupuestado: ' + $m(monto);
+  document.getElementById('modal-monto-real').value = monto.toFixed(2);
+  document.getElementById('modal-diff').textContent = '';
+  actualizarSelectsBancos();
+  document.getElementById('modal-pago').classList.add('open');
+  document.getElementById('modal-monto-real').oninput = function(){
+    const diff = parseFloat(this.value) - monto;
+    const el = document.getElementById('modal-diff');
+    if(Math.abs(diff)<0.01){ el.textContent='✓ Pago exacto'; el.style.color='var(--green)'; }
+    else if(diff>0){ el.textContent=`Pagas $${diff.toFixed(2)} más de lo presupuestado`; el.style.color='var(--orange)'; }
+    else{ el.textContent=`Pagas $${Math.abs(diff).toFixed(2)} menos de lo presupuestado`; el.style.color='var(--blue)'; }
+  };
+});
+
+expose('delPagoDeuda', async (id) => {
+  if(!confirm('¿Eliminar este pago presupuestado?')) return;
+  await deleteDoc(doc(db,'pagos_deudas',id));
+});
+
+
 // PAGO GASTO FIJO
 expose('abrirPago', (id, tipo, concepto, presupuesto) => {
   pagoItem = {id, tipo, concepto, presupuesto};
@@ -1154,10 +1263,22 @@ expose('confirmarPago', async () => {
     await updateDoc(doc(db,'gastos_var',pagoItem.id),{confirmado:true, montoReal, bancoId});
     const banco = bancosCache.find(b=>b.id===bancoId);
     if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+  } else if(pagoItem.deudaId){
+    // Pago de Deuda
+    await updateDoc(doc(db,'pagos_deudas',pagoItem.id),{confirmado:true, montoReal, bancoId});
+    const banco = bancosCache.find(b=>b.id===bancoId);
+    if(bancoId && banco) await updateDoc(doc(db,'bancos',bancoId),{saldo: banco.saldo - montoReal});
+    // Descontar de la deuda
+    const deuda = deudasCache.find(d=>d.id===pagoItem.deudaId);
+    if(deuda){
+      const nuevoSaldo = Math.max(0, deuda.saldoActual - montoReal);
+      await updateDoc(doc(db,'deudas',pagoItem.deudaId),{saldoActual: nuevoSaldo});
+    }
   }
   
   cerrarModal('modal-pago');
   pagoItem = null;
+  pagoDeuItem = null;
 });
 
 // ABONO DEUDA
@@ -1267,6 +1388,23 @@ expose('showStab', (id, btn) => {
   document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
   btn.classList.add('on');
 });
+
+expose('showTabDeudas', (id, btn) => {
+  ['lista','pagos'].forEach(t=>{
+    document.getElementById('tab-deudas-'+t).style.display = t===id?'block':'none';
+  });
+  document.querySelectorAll('#stab-deudas-lista, #stab-deudas-pagos').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if(id==='pagos'){
+    actualizarSelectDeudas();
+  }
+});
+
+function actualizarSelectDeudas(){
+  const el = document.getElementById('pago-deuda-id');
+  if(!el) return;
+  el.innerHTML = '<option value="">-- Seleccionar --</option>' + deudasCache.map(d=>`<option value="${d.id}">${d.nombre} (${$m(d.saldoActual)})</option>`).join('');
+}
 
 expose('cerrarModal', id => {
   document.getElementById(id).classList.remove('open');
