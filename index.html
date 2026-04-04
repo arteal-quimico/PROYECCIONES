@@ -211,6 +211,42 @@ body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-
       <p style="font-size:12px;color:var(--t3);margin-bottom:12px">Registra el saldo actual del banco como ingreso del próximo mes y avanza automáticamente.</p>
       <button class="btn-add" onclick="trasladarSaldoSiguienteMes()" style="width:100%">📤 Trasladar a Siguiente Mes</button>
     </div>
+    <div class="card">
+      <div class="card-tt">📊 Análisis: Proyectado vs Real</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">PRESUPUESTADO:</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Ingresos:</span><span style="color:var(--green)" id="pres-ing">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Gastos:</span><span style="color:var(--red)" id="pres-gas">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;border-bottom:1px solid var(--bd);padding-bottom:6px">
+          <span>Deudas a pagar:</span><span style="color:var(--red)" id="pres-deu">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600">
+          <span>Restante Proyectado:</span><span id="pres-rest" style="color:var(--gold)">$0.00</span>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--t3);margin-bottom:8px;font-weight:600">REAL (CONFIRMADO):</div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Ingresos:</span><span style="color:var(--green)" id="real-ing">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px">
+          <span>Gastos:</span><span style="color:var(--red)" id="real-gas">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;border-bottom:1px solid var(--bd);padding-bottom:6px">
+          <span>Deudas abonadas:</span><span style="color:var(--red)" id="real-deu">$0.00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600">
+          <span>Restante Real:</span><span id="real-rest" style="color:var(--gold)">$0.00</span>
+        </div>
+      </div>
+      <div id="analisis-resultado" style="text-align:center;font-size:12px;padding:8px;border-radius:var(--r2);background:var(--s2)">
+        Cargando análisis...
+      </div>
+    </div>
   </div>
 
   <div class="sec" id="sec-ingresos">
@@ -675,24 +711,23 @@ expose('trasladarSaldoSiguienteMes', async () => {
   const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
   const mesPróximoKey = mesKey(mesProximo);
   
-  // Crear ingreso de sobrante en el mes siguiente
+  // PRIMERO: Resetear saldo de todos los bancos a 0
+  for(const banco of bancosCache){
+    await updateDoc(doc(db,'bancos',banco.id),{saldo: 0});
+  }
+  
+  // LUEGO: Crear ingreso de sobrante en el mes siguiente como PENDIENTE
   await addDoc(collection(db,'ingresos'),{
     uid,
     concepto: 'Sobrante Mes Anterior',
     monto: totalBancos,
-    montoReal: totalBancos,
     tipo: 'sobrante',
     bancoId: '',
     banco: 'Saldo Inicial',
     fecha: hoy(),
     mesKey: mesPróximoKey,
-    recibido: true  // Ya está recibido
+    recibido: false  // PENDIENTE - para que el usuario lo confirme
   });
-  
-  // Limpiar saldo de todos los bancos
-  for(const banco of bancosCache){
-    await updateDoc(doc(db,'bancos',banco.id),{saldo: 0});
-  }
   
   // Cambiar al siguiente mes
   mesActual = mesProximo;
@@ -701,7 +736,7 @@ expose('trasladarSaldoSiguienteMes', async () => {
   await copiarGastosVarRecurrentes();
   renderMes();
   
-  alert('✅ Saldo trasladado y mes avanzado');
+  alert('✅ Saldo trasladado como ingreso pendiente. Mes avanzado.');
 });
 
 async function copiarGastosVarRecurrentes(){
@@ -733,10 +768,52 @@ function calcRestante(){
   const total = _ing - _gf - _gv - _gu;
   document.getElementById('kpi-res').textContent = $m(total);
   document.getElementById('kpi-res').className = 'kpi-v '+(total>=0?'g':'r');
+  calcAnalisDual();
+}
+
+function calcAnalisDual(){
+  // PRESUPUESTADO (todo lo que existe, confirmado o no)
+  const presIngresos = (_ing_total||0); // todos los ingresos
+  const presGastos = (_gf_total||0) + (_gv_total||0) + (_gu_total||0); // todos los gastos
+  const presDeu = (_deu_pagar||0); // deudas a pagar presupuestadas
+  const presRestante = presIngresos - presGastos - presDeu;
+  
+  // REAL (solo confirmados)
+  const realIngresos = _ing; // solo recibidos
+  const realGastos = _gf + _gv + _gu; // solo confirmados
+  const realDeu = (_deu_abonada||0); // solo abonadas
+  const realRestante = realIngresos - realGastos - realDeu;
+  
+  // Mostrar valores
+  document.getElementById('pres-ing').textContent = $m(presIngresos);
+  document.getElementById('pres-gas').textContent = $m(presGastos);
+  document.getElementById('pres-deu').textContent = $m(presDeu);
+  document.getElementById('pres-rest').textContent = $m(presRestante);
+  document.getElementById('pres-rest').style.color = presRestante >= 0 ? 'var(--green)' : 'var(--red)';
+  
+  document.getElementById('real-ing').textContent = $m(realIngresos);
+  document.getElementById('real-gas').textContent = $m(realGastos);
+  document.getElementById('real-deu').textContent = $m(realDeu);
+  document.getElementById('real-rest').textContent = $m(realRestante);
+  document.getElementById('real-rest').style.color = realRestante >= 0 ? 'var(--green)' : 'var(--red)';
+  
+  // Análisis
+  const elAnalisis = document.getElementById('analisis-resultado');
+  if(realRestante >= (realGastos + realDeu)){
+    elAnalisis.innerHTML = '✅ <strong>Excelente</strong><br>Vas con superávit. Controla bien.';
+    elAnalisis.style.color = 'var(--green)';
+  } else if(realRestante < 0){
+    elAnalisis.innerHTML = '⚠️ <strong>ALERTA</strong><br>Necesitas ajustar. Reduce gastos o deudas.';
+    elAnalisis.style.color = 'var(--red)';
+  } else {
+    elAnalisis.innerHTML = '📊 <strong>Equilibrio</strong><br>Estás dentro de presupuesto.';
+    elAnalisis.style.color = 'var(--orange)';
+  }
 }
 
 function renderIngresos(items){
   _ing = items.filter(i=>i.recibido).reduce((a,i)=>a+(i.montoReal||i.monto),0);
+  _ing_total = items.reduce((a,i)=>a+i.monto,0); // TODOS los ingresos (presupuestado)
   document.getElementById('kpi-ing').textContent = $m(_ing);
   const el = document.getElementById('lista-ingresos');
   if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos este mes</div>'; return; }
@@ -761,6 +838,7 @@ function renderIngresos(items){
 
 function renderGastosFijos(items){
   _gf = items.filter(i=>i.pagado).reduce((a,i)=>a+(i.montoReal||i.presupuesto),0);
+  _gf_total = items.reduce((a,i)=>a+i.presupuesto,0); // TODOS los gastos fijos (presupuestado)
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const el = document.getElementById('lista-gastos-fijos');
   if(!items.length){ el.innerHTML='<div class="empty">Sin gastos fijos este mes</div>'; return; }
@@ -806,6 +884,7 @@ function renderPendientes(items){
 
 function renderGastosVar(items){
   _gv = items.filter(i=>i.confirmado).reduce((a,i)=>a+(i.montoReal||i.monto),0);
+  _gv_total = items.reduce((a,i)=>a+i.monto,0); // TODOS los gastos variables (presupuestado)
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const el = document.getElementById('lista-gastos-var');
   if(!items.length){ el.innerHTML='<div class="empty">Sin gastos variables este mes</div>'; return; }
@@ -830,6 +909,7 @@ function renderGastosVar(items){
 
 function renderGustos(items){
   _gu = items.reduce((a,i)=>a+i.monto,0);
+  _gu_total = items.reduce((a,i)=>a+i.monto,0); // TODOS los gustos
   document.getElementById('kpi-gas').textContent = $m(_gf + _gv + _gu);
   const pct = Math.min(100, (_gu/gustosLimite)*100);
   document.getElementById('gustos-gastado').textContent = $m(_gu);
