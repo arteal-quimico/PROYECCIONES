@@ -1,81 +1,135 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Proyecciones App</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="logo.png">
-    <meta name="theme-color" content="#d4af37">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #000000; --card: #111111; --gold: #d4af37; --gold-dark: #aa8c2c;
-            --text: #ffffff; --text-dim: #a0a0a0; --border: #222222;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; overflow-x: hidden; }
-        
-        /* Login */
-        #login-wrap { height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .login-card { background: var(--card); border: 1px solid var(--border); padding: 30px; border-radius: 20px; width: 100%; max-width: 400px; text-align: center; }
-        
-        /* Header & Dashboard */
-        .header { padding: 40px 20px; text-align: center; background: linear-gradient(to bottom, #1a1505, #000); }
-        .status-dot { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 10px #2ecc71; }
-        .main-total { font-family: 'Playfair Display', serif; font-size: 3.5rem; color: var(--gold); margin: 10px 0; }
-        
-        /* Contenedores */
-        .container { padding: 20px; max-width: 600px; margin: 0 auto; }
-        .section-title { color: var(--gold); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
-        
-        /* Cards y Form */
-        .card { background: var(--card); border: 1px solid var(--border); border-radius: 15px; padding: 20px; margin-bottom: 20px; }
-        input, select { width: 100%; background: #000; border: 1px solid var(--border); color: #fff; padding: 12px; border-radius: 10px; margin-bottom: 15px; font-size: 1rem; }
-        button { width: 100%; background: var(--gold); color: #000; border: none; padding: 15px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: 0.3s; }
-        button:active { transform: scale(0.98); background: var(--gold-dark); }
-        
-        .banco-item { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px solid var(--border); }
-        .banco-nombre { font-weight: 500; }
-        .banco-saldo { color: var(--gold); font-weight: 600; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificador Financiero</title>
+<link rel="manifest" href="manifest-plan.json">
+<link rel="apple-touch-icon" href="logo.png">
+<meta name="theme-color" content="#d4af37">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080c10;--s1:#0f1520;--s2:#141c2a;--s3:#1a2235;
+  --bd:#1e2a40;--bd2:#253048;
+  --gold:#d4af37;--gold2:#f0cc5a;--gold3:#a8892a;
+  --green:#2ecc71;--red:#e74c3c;--blue:#3498db;--orange:#e67e22;--purple:#9b59b6;
+  --t1:#f0f4ff;--t2:#8899bb;--t3:#4a5878;
+  --r:14px;--r2:10px;--r3:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 30% 20%,#1a1500 0%,var(--bg) 60%)}
+.login-box{background:var(--s1);border:1px solid var(--bd);border-radius:20px;padding:44px 36px;width:90%;max-width:380px;text-align:center}
+.login-logo{font-family:'Playfair Display',serif;font-size:28px;color:var(--gold);margin-bottom:4px}
+.login-sub{color:var(--t3);font-size:12px;margin-bottom:32px;letter-spacing:.05em}
+.fi{width:100%;padding:11px 14px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:12px}
+.fi:focus{outline:none;border-color:var(--gold)}
+.btn-gold{width:100%;padding:13px;background:var(--gold);color:#080c10;border:none;border-radius:var(--r2);font-weight:700;font-size:15px;cursor:pointer;letter-spacing:.04em;margin-top:6px;font-family:'DM Sans',sans-serif}
+.btn-gold:hover{background:var(--gold2)}
+.pass-wrap{position:relative}
+.eye-btn{position:absolute;right:12px;top:11px;background:none;border:none;cursor:pointer;color:var(--t3);font-size:16px;width:auto;padding:0}
+
+/* APP */
+.app{display:none;max-width:480px;margin:0 auto;padding:0 0 80px 0}
+.topbar{padding:16px 16px 0;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.user-greeting{font-size:12px;color:var(--t3)}
+.user-greeting strong{color:var(--gold);display:block;font-size:15px;font-family:'Playfair Display',serif}
+.btn-sm{padding:5px 12px;border-radius:20px;border:1px solid var(--bd);background:transparent;color:var(--t3);font-size:11px;cursor:pointer}
+
+/* MES HEADER */
+.mes-header{margin:12px 16px;background:linear-gradient(135deg,var(--s1),var(--s2));border:1px solid var(--bd2);border-radius:var(--r);padding:16px}
+.mes-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mes-nav button{background:none;border:1px solid var(--bd);color:var(--t2);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px}
+.mes-titulo{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold)}
+.mes-kpis{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.kpi{background:var(--bg);border-radius:var(--r2);padding:10px 8px;text-align:center}
+.kpi-l{font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);margin-bottom:3px}
+.kpi-v{font-family:'Playfair Display',serif;font-size:16px}
+.kpi-v.g{color:var(--green)}.kpi-v.r{color:var(--red)}.kpi-v.gold{color:var(--gold)}
+
+/* NAV */
+.nav-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--s1);border-top:1px solid var(--bd);display:flex;padding:6px 0 10px;z-index:100}
+.nav-btn{flex:1;text-align:center;color:var(--t3);font-size:9px;cursor:pointer;padding:4px 2px}
+.nav-btn span{font-size:20px;display:block;margin-bottom:2px}
+.nav-btn.active{color:var(--gold)}
+
+/* SECCIONES */
+.sec{display:none;padding:0 16px}
+.sec.on{display:block}
+
+/* CARDS */
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.card-tt{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--t3);margin-bottom:12px;font-weight:600}
+.total-bancos{background:linear-gradient(135deg,#1a1200,#0f1a0a);border:1px solid var(--gold3);border-radius:var(--r);padding:14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.total-label{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
+.total-valor{font-family:'Playfair Display',serif;font-size:26px;color:var(--gold)}
+
+/* FORM INPUTS */
+.form-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:flex-end}
+.form-gr{flex:1;min-width:100px}
+.form-gr label{font-size:10px;color:var(--t3);display:block;margin-bottom:4px}
+.fi-sm{padding:8px 10px;background:var(--s2);border:1px solid var(--bd);border-radius:var(--r2);color:var(--t1);width:100%;font-family:'DM Sans',sans-serif;font-size:13px}
+.fi-sm:focus{outline:none;border-color:var(--gold)}
+.btn-add{padding:8px 16px;background:var(--gold);color:#080c10;border:none;border-radius:var(--r2);font-weight:700;cursor:pointer;font-size:12px;white-space:nowrap}
+</style>
 </head>
 <body>
 
-<div id="login-wrap">
-    <div class="login-card">
-        <h2 style="color:var(--gold); margin-bottom:20px;">XURI Acceso</h2>
-        <input type="email" id="l-email" placeholder="Email">
-        <input type="password" id="l-pass" placeholder="Contraseña">
-        <button onclick="doLogin()">ENTRAR</button>
+<div class="login-wrap" id="login-wrap">
+  <div class="login-box">
+    <div class="login-logo">💰 Planificador</div>
+    <div class="login-sub">Control de Finanzas Personales</div>
+    <input type="email" id="l-email" class="fi" placeholder="Correo electrónico">
+    <div class="pass-wrap">
+      <input type="password" id="l-pass" class="fi" placeholder="Contraseña">
+      <button class="eye-btn" onclick="togglePass()">👁️</button>
     </div>
+    <button class="btn-gold" onclick="doLogin()">INGRESAR</button>
+  </div>
 </div>
 
-<div id="app" style="display:none;">
-    <div class="header">
-        <div><span class="status-dot"></span><span style="font-size:0.8rem; color:var(--text-dim);">SISTEMA CONECTADO</span></div>
-        <div class="main-total" id="total-bancos">$0.00</div>
-        <div style="color:var(--text-dim); font-size:0.8rem;">TOTAL EN CUENTAS</div>
-    </div>
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="user-greeting"><strong id="user-name">Bienvenido</strong><span id="top-fecha"></span></div>
+    <button class="btn-sm" onclick="doLogout()">Salir</button>
+  </div>
 
-    <div class="container">
-        <div class="section-title">Nuevo Registro</div>
-        <div class="card">
-            <input type="text" id="b-nombre" placeholder="Nombre (Ej: Pichincha)">
-            <input type="number" id="b-saldo" placeholder="Saldo Inicial">
-            <select id="b-tipo">
-                <option value="Ahorros">Ahorros</option>
-                <option value="Corriente">Corriente</option>
-                <option value="Efectivo">Efectivo / Caja</option>
-            </select>
-            <button onclick="addBanco()">+ AGREGAR A MI FLUJO</button>
-        </div>
-
-        <div class="section-title">Mis Cuentas</div>
-        <div id="lista-bancos"></div>
-        
-        <button onclick="doLogout()" style="background:transparent; color:var(--text-dim); margin-top:40px; border:1px solid var(--border);">Cerrar Sesión</button>
+  <div class="mes-header">
+    <div class="mes-nav">
+      <button onclick="cambiarMes(-1)">‹</button>
+      <div class="mes-titulo" id="mes-titulo">Abril 2026</div>
+      <button onclick="cambiarMes(1)">›</button>
     </div>
+    <div class="mes-kpis">
+      <div class="kpi"><div class="kpi-l">Ingresos</div><div class="kpi-v g" id="kpi-ing">$0</div></div>
+      <div class="kpi"><div class="kpi-l">Gastos</div><div class="kpi-v r" id="kpi-gas">$0</div></div>
+      <div class="kpi"><div class="kpi-l">Restante</div><div class="kpi-v gold" id="kpi-res">$0</div></div>
+    </div>
+  </div>
+
+  <div class="sec on" id="sec-bancos">
+    <div class="total-bancos">
+      <div><div class="total-label">Total en Bancos</div><div class="total-valor" id="total-bancos">$0.00</div></div>
+      <div style="font-size:24px">🏦</div>
+    </div>
+    <div id="lista-bancos"></div>
+    <div class="card">
+      <div class="card-tt">Agregar Cuenta / Banco</div>
+      <div class="form-row">
+        <div class="form-gr"><label>Nombre del banco</label><input class="fi-sm" id="b-nombre" placeholder="Ej: Banco Pichincha"></div>
+        <div class="form-gr"><label>Saldo inicial ($)</label><input class="fi-sm" type="number" id="b-saldo" step="0.01"></div>
+      </div>
+      <button class="btn-add" onclick="addBanco()" style="width:100%">+ Agregar</button>
+    </div>
+  </div>
+
+  <nav class="nav-bar">
+    <div class="nav-btn active" onclick="showSec('bancos',this)"><span>🏦</span>Bancos</div>
+  </nav>
 </div>
 
 <script type="module">
@@ -101,84 +155,49 @@ let bancosCache = [];
 
 function expose(name, fn){ window[name] = fn; }
 
-// --- SINCRONIZACIÓN EN TIEMPO REAL ---
+onAuthStateChanged(auth, user => {
+  if(user){
+    uid = user.uid;
+    document.getElementById('login-wrap').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    iniciarSincronizacion();
+  } else {
+    uid = null;
+    document.getElementById('login-wrap').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+});
+
 function iniciarSincronizacion(){
-  const q = query(collection(db, 'bancos'), where('uid', '==', uid));
-  onSnapshot(q, (snap) => {
-    bancosCache = snap.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      // Nos aseguramos de leer saldoActual o saldo
-      monto: parseFloat(doc.data().saldoActual || doc.data().saldo || 0)
-    }));
-    actualizarPantalla();
+  const q = query(collection(db,'bancos'),where('uid','==',uid));
+  onSnapshot(q, snap => {
+    bancosCache = snap.docs.map(d => ({id:d.id, ...d.data(), monto: d.data().saldo || d.data().saldoActual || 0}));
+    const total = bancosCache.reduce((acc,b) => acc + b.monto, 0);
+    document.getElementById('total-bancos').textContent = '$' + total.toFixed(2);
+    document.getElementById('lista-bancos').innerHTML = bancosCache.map(b => `
+      <div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #222;">
+        <span>${b.nombre}</span><strong>$${b.monto.toFixed(2)}</strong>
+      </div>`).join('');
   });
 }
 
-function actualizarPantalla(){
-  const total = bancosCache.reduce((acc, b) => acc + b.monto, 0);
-  document.getElementById('total-bancos').textContent = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-  
-  const lista = document.getElementById('lista-bancos');
-  if(bancosCache.length === 0){
-    lista.innerHTML = '<p style="text-align:center; color:var(--text-dim);">No hay cuentas activas.</p>';
-    return;
-  }
-  
-  lista.innerHTML = bancosCache.map(b => `
-    <div class="banco-item">
-        <span class="banco-nombre">${b.nombre}</span>
-        <span class="banco-saldo">$${b.monto.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-    </div>
-  `).join('');
-}
-
-// --- ACCIONES ---
 expose('addBanco', async () => {
-    const nombre = document.getElementById('b-nombre').value.trim();
-    const saldo = parseFloat(document.getElementById('b-saldo').value) || 0;
-    const tipo = document.getElementById('b-tipo').value;
-
-    if(!nombre) { alert("Ingresa el nombre del banco"); return; }
-
-    try {
-        await addDoc(collection(db, 'bancos'), {
-            uid: uid,
-            nombre: nombre,
-            saldo: saldo,
-            saldoActual: saldo,
-            tipo: tipo,
-            fecha: new Date().toISOString()
-        });
-        document.getElementById('b-nombre').value = '';
-        document.getElementById('b-saldo').value = '';
-        console.log("Guardado correctamente");
-    } catch(e) {
-        alert("Error al guardar: " + e.message);
-    }
-});
-
-// --- SESIÓN ---
-onAuthStateChanged(auth, user => {
-    if(user){
-        uid = user.uid;
-        document.getElementById('login-wrap').style.display = 'none';
-        document.getElementById('app').style.display = 'block';
-        iniciarSincronizacion();
-    } else {
-        document.getElementById('login-wrap').style.display = 'flex';
-        document.getElementById('app').style.display = 'none';
-    }
+  const nombre = document.getElementById('b-nombre').value;
+  const saldo = parseFloat(document.getElementById('b-saldo').value) || 0;
+  if(!nombre) return;
+  await addDoc(collection(db,'bancos'), { uid, nombre, saldo, saldoActual: saldo });
+  document.getElementById('b-nombre').value = '';
+  document.getElementById('b-saldo').value = '';
 });
 
 expose('doLogin', () => {
-    const email = document.getElementById('l-email').value;
-    const pass = document.getElementById('l-pass').value;
-    signInWithEmailAndPassword(auth, email, pass).catch(e => alert("Error: " + e.message));
+  signInWithEmailAndPassword(auth, document.getElementById('l-email').value, document.getElementById('l-pass').value);
 });
-
 expose('doLogout', () => signOut(auth));
-
+expose('togglePass', () => {
+  const p = document.getElementById('l-pass');
+  p.type = p.type === 'password' ? 'text' : 'password';
+});
 </script>
 </body>
 </html>
