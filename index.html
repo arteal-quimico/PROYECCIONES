@@ -711,12 +711,7 @@ expose('trasladarSaldoSiguienteMes', async () => {
   const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
   const mesPróximoKey = mesKey(mesProximo);
   
-  // PRIMERO: Resetear saldo de todos los bancos a 0
-  for(const banco of bancosCache){
-    await updateDoc(doc(db,'bancos',banco.id),{saldo: 0});
-  }
-  
-  // LUEGO: Crear ingreso de sobrante en el mes siguiente como PENDIENTE
+  // Crear ingreso de sobrante en el mes siguiente como PENDIENTE
   await addDoc(collection(db,'ingresos'),{
     uid,
     concepto: 'Sobrante Mes Anterior',
@@ -726,7 +721,7 @@ expose('trasladarSaldoSiguienteMes', async () => {
     banco: 'Saldo Inicial',
     fecha: hoy(),
     mesKey: mesPróximoKey,
-    recibido: false  // PENDIENTE - para que el usuario lo confirme
+    recibido: false  // PENDIENTE
   });
   
   // Cambiar al siguiente mes
@@ -764,6 +759,8 @@ async function copiarGastosVarRecurrentes(){
 }
 
 let _ing=0,_gf=0,_gv=0,_gu=0;
+let _ing_total=0,_gf_total=0,_gv_total=0,_gu_total=0;
+let _deu_pagar=0,_deu_abonada=0;
 function calcRestante(){
   const total = _ing - _gf - _gv - _gu;
   document.getElementById('kpi-res').textContent = $m(total);
@@ -816,7 +813,7 @@ function renderIngresos(items){
   _ing_total = items.reduce((a,i)=>a+i.monto,0); // TODOS los ingresos (presupuestado)
   document.getElementById('kpi-ing').textContent = $m(_ing);
   const el = document.getElementById('lista-ingresos');
-  if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos este mes</div>'; return; }
+  if(!items.length){ el.innerHTML='<div class="empty">Sin ingresos este mes</div>'; calcRestante(); return; }
   el.innerHTML = items.map(i=>{
     const badge = i.recibido ? `<span class="item-badge badge-ok">Recibido</span>` : `<span class="item-badge badge-pen">Pendiente</span>`;
     const diff = i.recibido && i.montoReal ? (i.montoReal - i.monto) : 0;
@@ -834,6 +831,7 @@ function renderIngresos(items){
       </div>
     </div>`;
   }).join('');
+  calcRestante();
 }
 
 function renderGastosFijos(items){
