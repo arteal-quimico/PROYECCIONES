@@ -607,6 +607,36 @@ async function copiarGastosFijosRecurrentes(){
       });
     }
   }
+  
+  // Crear ingreso automático del sobrante del mes anterior
+  await crearIngresoSobrante();
+}
+
+async function crearIngresoSobrante(){
+  const mesActualKey = mesKey(mesActual);
+  
+  // Verificar si ya existe ingreso de sobrante para este mes
+  const existentes = await getDocs(query(collection(db,'ingresos'),where('uid','==',uid),where('mesKey','==',mesActualKey),where('concepto','==','Sobrante Mes Anterior')));
+  if(existentes.docs.length > 0) return; // Ya existe
+  
+  // Obtener saldo total de todos los bancos
+  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
+  
+  if(totalBancos > 0){
+    // Crear ingreso de sobrante como recibido automáticamente
+    await addDoc(collection(db,'ingresos'),{
+      uid,
+      concepto: 'Sobrante Mes Anterior',
+      monto: totalBancos,
+      montoReal: totalBancos,
+      tipo: 'sobrante',
+      bancoId: '',
+      banco: 'Saldo Inicial',
+      fecha: hoy(),
+      mesKey: mesActualKey,
+      recibido: true  // Ya está recibido
+    });
+  }
 }
 
 async function copiarGastosVarRecurrentes(){
@@ -635,8 +665,7 @@ async function copiarGastosVarRecurrentes(){
 
 let _ing=0,_gf=0,_gv=0,_gu=0;
 function calcRestante(){
-  const totalBancos = bancosCache.reduce((a,b)=>a+b.saldo,0);
-  const total = _ing - _gf - _gv - _gu + totalBancos;
+  const total = _ing - _gf - _gv - _gu;
   document.getElementById('kpi-res').textContent = $m(total);
   document.getElementById('kpi-res').className = 'kpi-v '+(total>=0?'g':'r');
 }
