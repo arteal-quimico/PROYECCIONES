@@ -740,6 +740,18 @@ expose('trasladarSaldoSiguienteMes', async () => {
   const mesProximo = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 1);
   const mesPróximoKey = mesKey(mesProximo);
   
+  // Verificar si ya existe sobrante para ese mes (evitar duplicado)
+  const existente = await getDocs(query(collection(db,'ingresos'),where('uid','==',uid),where('mesKey','==',mesPróximoKey),where('concepto','==','Sobrante Mes Anterior')));
+  if(existente.docs.length > 0){
+    alert('Ya existe un sobrante registrado para el siguiente mes.');
+    mesActual = mesProximo;
+    actualizarMesTitulo();
+    await copiarGastosFijosRecurrentes();
+    await copiarGastosVarRecurrentes();
+    renderMes();
+    return;
+  }
+  
   // Crear ingreso de sobrante en el mes siguiente como PENDIENTE
   await addDoc(collection(db,'ingresos'),{
     uid,
