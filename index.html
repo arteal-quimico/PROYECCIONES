@@ -682,8 +682,6 @@ expose('trasladarSaldoSiguienteMes', async () => {
   // Cambiar al siguiente mes
   mesActual = mesProximo;
   actualizarMesTitulo();
-  await copiarGastosFijosRecurrentes();
-  await copiarGastosVarRecurrentes();
   renderMes();
   
   alert('✅ Saldo trasladado y mes avanzado');
